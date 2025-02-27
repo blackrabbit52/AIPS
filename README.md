@@ -1,6 +1,38 @@
 # AIPS - AI Personality Analysis System
 
-## Architecture Overview
+## Detailed Architecture
+
+### System Overview
+```
+┌─────────────────┐     ┌──────────────┐
+│   API Gateway   │────▶│    Redis     │
+│    (Nginx)      │     │   (Cache)    │
+└─────────┬───────┘     └──────────────┘
+          │
+          ▼
+┌─────────┴───────┐     ┌──────────────┐
+│  Load Balancer  │────▶│ Elasticsearch │
+└─────────┬───────┘     │   (Search)    │
+          │             └──────────────┘
+          ▼
+┌─────────┴───────┐     ┌──────────────┐
+│  Authentication │────▶│   Auth DB     │
+│  (Spring Boot)  │     │  (Postgres)   │
+└─────────┬───────┘     └──────────────┘
+          │
+┌─────────┴───────┐     ┌──────────────┐
+│    Analysis     │────▶│ Analysis DB   │
+│    (Django)     │     │  (Postgres)   │
+└─────────┬───────┘     └──────────────┘
+          │
+┌─────────┴───────┐     ┌──────────────┐
+│ Recommendation  │────▶│   Recom DB    │
+│    (Flask)      │     │  (Postgres)   │
+└─────────┬───────┘     └──────────────┘
+          │
+┌─────────┴───────┐
+│    Frontend     │
+│    (React)      │
 
 AIPS is built using a microservices architecture, with the following components:
 
