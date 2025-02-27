@@ -95,14 +95,9 @@ services:
     build: 
       context: ./aips
       dockerfile: Dockerfile
-      target: development
-      cache_from:
-        - aips_cache
     volumes:
-      - ./aips:/app:delegated
-      - node_modules:/app/node_modules:cached
-      - npm_cache:/root/.npm:cached
-      - aips_cache:/root/.cache:cached
+      - ./aips:/app
+      - /app/node_modules
     environment:
       - NODE_ENV=development
       - CHOKIDAR_USEPOLLING=true
@@ -111,7 +106,10 @@ services:
     ports:
       - "3000:3000"
     stdin_open: true
-    command: npm start
+    command: >
+      sh -c "mkdir -p /app/node_modules/.cache &&
+             chmod -R 777 /app/node_modules/.cache &&
+             WATCHPACK_POLLING=true npm start"
 
   # Databases
   analysis-db:

@@ -1,0 +1,15 @@
+apiVersion: 1
+
+providers:
+  - name: 'AIPS Dashboards'
+    orgId: 1
+    folder: 'AIPS'
+    folderUid: 'aips'
+    type: file
+    disableDeletion: false
+    editable: true
+    updateIntervalSeconds: 10
+    allowUiUpdates: true
+    options:
+      path: /etc/grafana/provisioning/dashboards
+      foldersFromFilesStructure: true 

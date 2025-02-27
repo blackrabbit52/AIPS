@@ -11,15 +11,17 @@ RUN apt-get update && apt-get install -y \
 # Set pip cache directory and configuration
 ENV PIP_CACHE_DIR=/root/.cache/pip
 ENV PIP_NO_CACHE_DIR=false
+ENV PIP_TIMEOUT=1000
+ENV PIP_RETRIES=10
 
 # Install Python dependencies using the cache
 COPY requirements.txt .
-RUN --mount=type=cache,target=/root/.cache/pip \
-    pip install -r requirements.txt
+RUN --mount=type=cache,target=/root/.cache/pip,id=pip_cache \
+    pip install --cache-dir=/root/.cache/pip -r requirements.txt
 
 # Install development tools (also using cache)
-RUN --mount=type=cache,target=/root/.cache/pip \
-    pip install watchdog[watchmedo]
+RUN --mount=type=cache,target=/root/.cache/pip,id=pip_cache \
+    pip install --cache-dir=/root/.cache/pip watchdog[watchmedo]
 
 # Source code will be mounted as a volume
 EXPOSE 8000

@@ -1,19 +1,25 @@
-FROM node:16-alpine as development
+FROM node:16-alpine
 
 WORKDIR /app
 
 # Install required system dependencies
 RUN apk add --no-cache python3 make g++
 
-# Configure npm for better reliability and caching
-RUN npm config set fetch-retry-maxtimeout 600000 && \
-    npm config set fetch-retry-mintimeout 100000 && \
-    npm config set fetch-retries 5 && \
-    npm config set cache /root/.npm
+# Configure npm
+ENV NODE_ENV=development
+ENV CHOKIDAR_USEPOLLING=true
+ENV WATCHPACK_POLLING=true
+ENV FAST_REFRESH=true
+
+# Create cache directories with correct permissions
+RUN mkdir -p /app/node_modules/.cache && \
+    chmod -R 777 /app/node_modules/.cache
+
+# Copy package files
+COPY package*.json ./
 
 # Install dependencies
-COPY package*.json ./
-RUN npm install --network-timeout=600000
+RUN npm install --legacy-peer-deps
 
 # Source code will be mounted as a volume
 EXPOSE 3000
@@ -26,7 +32,7 @@ FROM node:16-alpine as build
 WORKDIR /app
 
 COPY package*.json ./
-RUN npm install --network-timeout=600000
+RUN npm install --legacy-peer-deps
 
 COPY . .
 RUN npm run build
