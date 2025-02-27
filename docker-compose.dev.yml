@@ -1,0 +1,178 @@
+version: '3.8'
+
+services:
+  # API Gateway
+  api-gateway:
+    image: nginx:alpine
+    ports:
+      - "8888:80"
+    volumes:
+      - ./deployment/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      - analysis
+      - authentication
+      - recommendation
+      - aips
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:80/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Analysis Service (Django)
+  analysis:
+    build: 
+      context: ./backend/analysis
+      dockerfile: Dockerfile.dev
+      cache_from:
+        - analysis_cache
+    volumes:
+      - ./backend/analysis:/app:delegated
+      - pip_cache:/root/.cache/pip:cached
+      - analysis_venv:/app/venv:cached
+      - analysis_cache:/root/.cache:cached
+    environment:
+      - PYTHONUNBUFFERED=1
+      - DJANGO_SETTINGS_MODULE=analysis.settings
+      - DATABASE_URL=postgresql://postgres:postgres@analysis-db:5432/analysis
+      - DEBUG=1
+      - DJANGO_DEVELOPMENT=1
+      - PIP_CACHE_DIR=/root/.cache/pip
+      - PIP_NO_CACHE_DIR=false
+    ports:
+      - "8000:8000"
+    command: python manage.py runserver 0.0.0.0:8000
+    depends_on:
+      - analysis-db
+
+  # Authentication Service (Spring)
+  authentication:
+    build: 
+      context: ./backend/authentication
+      dockerfile: Dockerfile.dev
+      cache_from:
+        - authentication_cache
+    volumes:
+      - ./backend/authentication:/app:delegated
+      - maven_cache:/root/.m2:cached
+      - authentication_cache:/root/.cache:cached
+    environment:
+      - SPRING_PROFILES_ACTIVE=dev
+      - DATABASE_URL=jdbc:postgresql://auth-db:5432/auth
+      - SPRING_DEVTOOLS_RESTART_ENABLED=true
+    ports:
+      - "8080:8080"
+    depends_on:
+      - auth-db
+
+  # Recommendation Service (Flask)
+  recommendation:
+    build: 
+      context: ./backend/recommendation
+      dockerfile: Dockerfile.dev
+      cache_from:
+        - recommendation_cache
+    volumes:
+      - ./backend/recommendation:/app:delegated
+      - pip_cache:/root/.cache/pip:cached
+      - recommendation_venv:/app/venv:cached
+      - recommendation_cache:/root/.cache:cached
+    environment:
+      - FLASK_ENV=development
+      - FLASK_APP=app
+      - FLASK_DEBUG=1
+      - DATABASE_URL=postgresql://postgres:postgres@recommendation-db:5432/recommendation
+      - PIP_CACHE_DIR=/root/.cache/pip
+      - PIP_NO_CACHE_DIR=false
+    ports:
+      - "5000:5000"
+    command: flask run --host=0.0.0.0 --port=5000 --reload
+    depends_on:
+      - recommendation-db
+
+  # Frontend AIPS (React)
+  aips:
+    build: 
+      context: ./aips
+      dockerfile: Dockerfile
+      target: development
+      cache_from:
+        - aips_cache
+    volumes:
+      - ./aips:/app:delegated
+      - node_modules:/app/node_modules:cached
+      - npm_cache:/root/.npm:cached
+      - aips_cache:/root/.cache:cached
+    environment:
+      - NODE_ENV=development
+      - CHOKIDAR_USEPOLLING=true
+      - WATCHPACK_POLLING=true
+      - FAST_REFRESH=true
+    ports:
+      - "3000:3000"
+    stdin_open: true
+    command: npm start
+
+  # Databases
+  analysis-db:
+    image: postgres:13
+    environment:
+      - POSTGRES_DB=analysis
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+    volumes:
+      - analysis_db_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+
+  auth-db:
+    image: postgres:13
+    environment:
+      - POSTGRES_DB=auth
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+    volumes:
+      - auth_db_data:/var/lib/postgresql/data
+    ports:
+      - "5433:5432"
+
+  recommendation-db:
+    image: postgres:13
+    environment:
+      - POSTGRES_DB=recommendation
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+    volumes:
+      - recommendation_db_data:/var/lib/postgresql/data
+    ports:
+      - "5434:5432"
+
+  # Redis for caching
+  redis:
+    image: redis:6
+    ports:
+      - "6379:6379"
+
+  # Elasticsearch for search
+  elasticsearch:
+    image: elasticsearch:7.9.3
+    environment:
+      - discovery.type=single-node
+      - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
+    ports:
+      - "9200:9200"
+
+volumes:
+  analysis_db_data:
+  auth_db_data:
+  recommendation_db_data:
+  pip_cache:
+  maven_cache:
+  npm_cache:
+  node_modules:
+  analysis_venv:
+  recommendation_venv:
+  analysis_cache:
+  authentication_cache:
+  recommendation_cache:
+  aips_cache: 

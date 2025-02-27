@@ -1,0 +1,106 @@
+# Environment variables
+.env
+*.env
+
+# Python (Django & Flask)
+__pycache__/
+*.py[cod]
+*.so
+.Python
+env/
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+*.egg-info/
+.installed.cfg
+*.egg
+*.log
+.coverage
+htmlcov/
+.pytest_cache/
+.venv/
+venv/
+
+# Java (Spring)
+target/
+!.mvn/wrapper/maven-wrapper.jar
+!**/src/main/**/target/
+!**/src/test/**/target/
+*.class
+*.jar
+*.war
+*.ear
+*.logs
+.apt_generated
+.classpath
+.factorypath
+.project
+.settings
+.springBeans
+.sts4-cache
+
+# Node.js (React)
+node_modules/
+/frontend/build
+/frontend/dist
+.npm
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+.DS_Store
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*.swn
+*.bak
+
+# Docker
+.docker/
+docker-compose.override.yml
+
+# SSL certificates
+deployment/nginx/ssl/*.crt
+deployment/nginx/ssl/*.key
+deployment/nginx/ssl/*.pem
+deployment/nginx/.htpasswd
+
+# Database
+*.sqlite3
+*.db
+
+# Logs
+logs/
+*.log
+
+# Cache
+.cache/
+__pycache__/
+.pytest_cache/
+.mypy_cache/
+
+# Celery
+celerybeat-schedule
+celerybeat.pid
+
+# Redis
+*.rdb
+*.aof
+
+# Elasticsearch
+data/elasticsearch/ 

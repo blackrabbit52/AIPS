@@ -1,0 +1,164 @@
+version: '3.8'
+
+services:
+  nginx:
+    image: nginx:alpine
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/nginx.prod.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/ssl:/etc/nginx/ssl:ro
+      - ../frontend/build:/usr/share/nginx/html:ro
+    depends_on:
+      - authentication
+      - analysis
+      - recommendation
+    restart: always
+    networks:
+      - frontend
+      - backend
+
+  authentication:
+    build:
+      context: ../backend/authentication
+      dockerfile: Dockerfile.prod
+    environment:
+      - SPRING_PROFILES_ACTIVE=prod
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://auth-db:5432/auth
+      - SPRING_DATASOURCE_USERNAME=${DB_USER}
+      - SPRING_DATASOURCE_PASSWORD=${DB_PASSWORD}
+      - JWT_SECRET=${JWT_SECRET}
+    depends_on:
+      - auth-db
+      - redis
+    restart: always
+    networks:
+      - backend
+
+  analysis:
+    build:
+      context: ../backend/analysis
+      dockerfile: Dockerfile.prod
+    environment:
+      - DJANGO_SETTINGS_MODULE=analysis.settings.production
+      - DATABASE_URL=postgres://${DB_USER}:${DB_PASSWORD}@analysis-db:5432/analysis
+      - REDIS_URL=redis://redis:6379/0
+      - CELERY_BROKER_URL=redis://redis:6379/0
+    depends_on:
+      - analysis-db
+      - redis
+    restart: always
+    networks:
+      - backend
+
+  recommendation:
+    build:
+      context: ../backend/recommendation
+      dockerfile: Dockerfile.prod
+    environment:
+      - FLASK_ENV=production
+      - DATABASE_URL=postgresql://${DB_USER}:${DB_PASSWORD}@recommendation-db:5432/recommendation
+      - REDIS_URL=redis://redis:6379/0
+    depends_on:
+      - recommendation-db
+      - redis
+    restart: always
+    networks:
+      - backend
+
+  celery-worker:
+    build:
+      context: ../backend/analysis
+      dockerfile: Dockerfile.prod
+    command: celery -A analysis worker -l info --concurrency=4
+    environment:
+      - DJANGO_SETTINGS_MODULE=analysis.settings.production
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis:6379/0
+    depends_on:
+      - redis
+    restart: always
+    networks:
+      - backend
+
+  celery-beat:
+    build:
+      context: ../backend/analysis
+      dockerfile: Dockerfile.prod
+    command: celery -A analysis beat -l info
+    environment:
+      - DJANGO_SETTINGS_MODULE=analysis.settings.production
+      - CELERY_BROKER_URL=redis://redis:6379/0
+    depends_on:
+      - redis
+    restart: always
+    networks:
+      - backend
+
+  redis:
+    image: redis:alpine
+    command: redis-server --appendonly yes
+    volumes:
+      - redis-data:/data
+    restart: always
+    networks:
+      - backend
+
+  elasticsearch:
+    image: elasticsearch:7.9.3
+    environment:
+      - discovery.type=single-node
+      - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
+    volumes:
+      - elasticsearch-data:/usr/share/elasticsearch/data
+    restart: always
+    networks:
+      - backend
+
+  auth-db:
+    image: postgres:13-alpine
+    environment:
+      - POSTGRES_DB=auth
+      - POSTGRES_USER=${DB_USER}
+      - POSTGRES_PASSWORD=${DB_PASSWORD}
+    volumes:
+      - auth-db-data:/var/lib/postgresql/data
+    restart: always
+    networks:
+      - backend
+
+  analysis-db:
+    image: postgres:13-alpine
+    environment:
+      - POSTGRES_DB=analysis
+      - POSTGRES_USER=${DB_USER}
+      - POSTGRES_PASSWORD=${DB_PASSWORD}
+    volumes:
+      - analysis-db-data:/var/lib/postgresql/data
+    restart: always
+    networks:
+      - backend
+
+  recommendation-db:
+    image: postgres:13-alpine
+    environment:
+      - POSTGRES_DB=recommendation
+      - POSTGRES_USER=${DB_USER}
+      - POSTGRES_PASSWORD=${DB_PASSWORD}
+    volumes:
+      - recommendation-db-data:/var/lib/postgresql/data
+    restart: always
+    networks:
+      - backend
+
+volumes:
+  redis-data:
+  elasticsearch-data:
+  auth-db-data:
+  analysis-db-data:
+  recommendation-db-data:
+
+networks:
+  frontend:
+  backend: 

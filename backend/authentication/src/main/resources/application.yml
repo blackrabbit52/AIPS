@@ -1,0 +1,44 @@
+server:
+  port: 8080
+  servlet:
+    context-path: /api
+
+spring:
+  # Database Configuration
+  datasource:
+    url: ${DATABASE_URL:jdbc:postgresql://auth-db:5432/auth}
+    username: ${DATABASE_USERNAME:postgres}
+    password: ${DATABASE_PASSWORD:postgres}
+    driver-class-name: org.postgresql.Driver
+  
+  # JPA Configuration
+  jpa:
+    database-platform: org.hibernate.dialect.PostgreSQLDialect
+    hibernate:
+      ddl-auto: update
+    show-sql: false
+    properties:
+      hibernate:
+        format_sql: true
+
+# Application Configuration
+app:
+  # JWT Configuration
+  jwt:
+    # Secret key for signing JWT tokens (should be changed in production)
+    secret: ${JWT_SECRET:your-secret-key-here-minimum-32-chars}
+    # Token expiration time in milliseconds (24 hours)
+    expiration: 86400000
+
+# Logging Configuration
+logging:
+  level:
+    root: INFO
+    com.aips.authentication: DEBUG
+    org.springframework.security: INFO
+
+cors:
+  allowed-origins: ${CORS_ALLOWED_ORIGINS:*}
+  allowed-methods: ${CORS_ALLOWED_METHODS:GET,POST,PUT,DELETE,OPTIONS}
+  allowed-headers: ${CORS_ALLOWED_HEADERS:*}
+  exposed-headers: ${CORS_EXPOSED_HEADERS:Authorization} 
