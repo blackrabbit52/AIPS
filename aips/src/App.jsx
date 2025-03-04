@@ -1,58 +1,20 @@
 import React, { useState, useMemo } from 'react';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
-import { ThemeProvider, createTheme } from '@mui/material';
+import { ThemeProvider, CssBaseline } from '@mui/material';
+import getTheme from './theme/theme';
 import { Layout } from './components/layout/Layout';
-import { Home } from './components/Home';
-import { Login } from './components/auth/Login';
-import { Register } from './components/auth/Register';
-import { Dashboard } from './components/Dashboard';
-import { Analysis } from './components/Analysis';
-import { Settings } from './components/Settings';
-import { Profile } from './components/Profile';
-import CssBaseline from '@mui/material/CssBaseline';
+
+// Import pages
+import Home from './pages/Home.jsx';
+import Login from './pages/Login.jsx';
+import Register from './pages/Register';
+import Dashboard from './pages/Dashboard';
+import Analysis from './pages/Analysis.jsx';
+import Profile from './pages/Profile';
 
 function App() {
   const [isDarkMode, setIsDarkMode] = useState(false);
-
-  const theme = useMemo(
-    () =>
-      createTheme({
-        palette: {
-          mode: isDarkMode ? 'dark' : 'light',
-          primary: {
-            main: '#1976d2',
-          },
-          secondary: {
-            main: '#dc004e',
-          },
-          background: {
-            default: isDarkMode ? '#121212' : '#f5f5f5',
-            paper: isDarkMode ? '#1e1e1e' : '#ffffff',
-          },
-        },
-        typography: {
-          fontFamily: [
-            '-apple-system',
-            'BlinkMacSystemFont',
-            '"Segoe UI"',
-            'Roboto',
-            '"Helvetica Neue"',
-            'Arial',
-            'sans-serif',
-          ].join(','),
-        },
-        components: {
-          MuiDrawer: {
-            styleOverrides: {
-              paper: {
-                backgroundColor: isDarkMode ? '#1e1e1e' : '#ffffff',
-              },
-            },
-          },
-        },
-      }),
-    [isDarkMode]
-  );
+  const theme = useMemo(() => getTheme(isDarkMode ? 'dark' : 'light'), [isDarkMode]);
 
   const toggleTheme = () => {
     setIsDarkMode(!isDarkMode);
@@ -69,7 +31,6 @@ function App() {
             <Route path="/register" element={<Register />} />
             <Route path="/dashboard" element={<Dashboard />} />
             <Route path="/analysis" element={<Analysis />} />
-            <Route path="/settings" element={<Settings />} />
             <Route path="/profile" element={<Profile />} />
           </Routes>
         </Layout>

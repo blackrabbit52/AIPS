@@ -8,31 +8,33 @@
 │   API Gateway   │────▶│    Redis     │
 │    (Nginx)      │     │   (Cache)    │
 └─────────┬───────┘     └──────────────┘
-          │
-          ▼
-┌─────────┴───────┐     ┌──────────────┐
-│  Load Balancer  │────▶│ Elasticsearch │
-└─────────┬───────┘     │   (Search)    │
-          │             └──────────────┘
-          ▼
-┌─────────┴───────┐     ┌──────────────┐
-│  Authentication │────▶│   Auth DB     │
-│  (Spring Boot)  │     │  (Postgres)   │
-└─────────┬───────┘     └──────────────┘
-          │
-┌─────────┴───────┐     ┌──────────────┐
-│    Analysis     │────▶│ Analysis DB   │
-│    (Django)     │     │  (Postgres)   │
-└─────────┬───────┘     └──────────────┘
-          │
-┌─────────┴───────┐     ┌──────────────┐
-│ Recommendation  │────▶│   Recom DB    │
-│    (Flask)      │     │  (Postgres)   │
-└─────────┬───────┘     └──────────────┘
-          │
-┌─────────┴───────┐
-│    Frontend     │
-│    (React)      │
+          │             ┌──────────────┐
+          │        ┌───▶│    Celery    │
+          ▼        │    │   (Workers)  │
+┌─────────┴───────┐│    └──────────────┘
+│  Load Balancer  ││    ┌──────────────┐
+└─────────┬───────┘├───▶│ Elasticsearch │
+          │        │    │   (Search)    │
+          ▼        │    └──────────────┘
+┌─────────┴───────┐│    
+│  Authentication ││    ┌──────────────┐
+│  (Spring Boot)  │├───▶│   Auth DB    │
+└─────────┬───────┘│    │  (Postgres)  │
+          │        │    └──────────────┘
+┌─────────┴───────┐│    
+│    Analysis     ││    ┌──────────────┐
+│    (Django)     │├───▶│ Analysis DB  │
+└─────────┬───────┘│    │  (Postgres)  │
+          │        │    └──────────────┘
+┌─────────┴───────┐│    
+│ Recommendation  ││    ┌──────────────┐
+│    (Flask)      │├───▶│   Recom DB   │
+└─────────┬───────┘│    │  (Postgres)  │
+          │        │    └──────────────┘
+┌─────────┴───────┐│
+│    Frontend     ││
+│    (React)      ││
+└─────────────────┘│
 
 AIPS is built using a microservices architecture, with the following components:
 
@@ -66,6 +68,101 @@ AIPS is built using a microservices architecture, with the following components:
 - Data processing and feature extraction
 - Results caching and optimization
 - API endpoints for analysis requests
+- Asynchronous task processing with Celery
+- Dataset management and model training
+
+##### Automatic Dataset Management
+The Analysis Service includes an automated dataset management system that:
+- Automatically fetches relevant personality datasets from Kaggle
+- Supports both MBTI and OCEAN personality models
+- Downloads and organizes datasets by type
+- Tracks dataset metadata and usage statistics
+
+Pre-configured datasets include:
+1. MBTI Datasets:
+   - MBTI Personality Types Dataset (16 personality types)
+   - Twitter Personality Dataset (social media correlations)
+
+2. OCEAN Datasets:
+   - Big Five Personality Test Dataset
+   - Facebook Posts and Personality Scores
+
+##### New API Endpoints (v1)
+```
+POST /api/v1/analysis/analyze_text/
+- Analyze personality from text input
+- Body: { "text": "string" }
+- Response: Personality analysis results (MBTI & OCEAN)
+
+POST /api/v1/analysis/analyze_social_media/
+- Analyze personality from social media profile
+- Body: {
+    "username": "string",
+    "platform": "twitter|facebook|linkedin",
+    "start_date": "YYYY-MM-DD",
+    "end_date": "YYYY-MM-DD"
+  }
+- Response: Personality analysis results
+
+GET /api/v1/datasets/
+- List available datasets
+- Response: Array of datasets with metadata
+
+POST /api/v1/datasets/fetch_kaggle/
+- Automatically download all relevant personality datasets
+- No body required
+- Response: Task status and dataset information
+
+GET /api/v1/datasets/by_type?type=MBTI|OCEAN
+- Get datasets filtered by type
+- Response: Filtered list of datasets
+
+GET /api/v1/models/
+- List trained models
+- Response: Array of trained models with metrics
+
+GET /api/v1/models/by_type?type=MBTI|OCEAN
+- Get models filtered by type
+- Response: Filtered list of models
+
+POST /api/v1/models/train/
+- Train new personality model
+- Body: {
+    "dataset_ids": ["int"],
+    "model_type": "MBTI|OCEAN"
+  }
+- Response: Training task status
+```
+
+##### Dataset Organization
+```
+data/
+├── datasets/
+│   ├── mbti/              # MBTI-related datasets
+│   │   ├── personality-types/
+│   │   └── twitter-data/
+│   └── ocean/             # OCEAN-related datasets
+│       ├── big-five-test/
+│       └── facebook-scores/
+└── models/
+    ├── mbti/             # Trained MBTI models
+    └── ocean/            # Trained OCEAN models
+```
+
+##### Asynchronous Processing
+The Analysis Service uses Celery for handling time-consuming tasks:
+- Dataset downloads and preprocessing
+- Model training and evaluation
+- Social media data collection
+- Batch personality analysis
+- Cache management
+
+Tasks are queued in Redis and processed by Celery workers, ensuring:
+- Scalable processing
+- Background execution
+- Task prioritization
+- Progress tracking
+- Error handling and retries
 
 #### Recommendation Service (Flask)
 - Personalized recommendations
@@ -142,12 +239,45 @@ chmod +x scripts/rebuild.sh
 scripts/rebuild.ps1
 ```
 
+Alternative commands using Docker Compose directly:
+```bash
+# Launch all services
+docker-compose up
+
+# Launch a specific service (e.g., frontend)
+DOCKER_BUILDKIT=1 docker-compose build aips && docker-compose up aips
+
+# Launch multiple services (e.g., frontend and analysis)
+DOCKER_BUILDKIT=1 docker-compose build aips analysis && docker-compose up aips analysis
+
+# Launch a service with its dependencies (e.g., analysis service with its database)
+DOCKER_BUILDKIT=1 docker-compose build analysis && docker-compose up analysis analysis-db
+```
+
+Note: Using `DOCKER_BUILDKIT=1` enables better caching and faster builds. The build step can be skipped if no changes were made to the service's files.
+
 4. **Access the services**
 - Frontend: http://localhost:3000
 - API Gateway: http://localhost:8888
 - Authentication Service: http://localhost:8080
 - Analysis Service: http://localhost:8000
 - Recommendation Service: http://localhost:5000
+
+## Cache Management
+
+To clean all Docker volumes (which will clear all caches) for the project:
+```bash
+# Remove all volumes with 'aips' prefix
+docker volume rm $(docker volume ls -q | grep aips)
+```
+
+This command will remove all Docker volumes associated with the project (those prefixed with 'aips'). Use this when you want to:
+- Clear all caches and start fresh
+- Resolve dependency conflicts
+- Free up disk space
+- Reset the project to a clean state
+
+Note: After running this command, the next build will take longer as it needs to download all dependencies again.
 
 ## Development Setup
 

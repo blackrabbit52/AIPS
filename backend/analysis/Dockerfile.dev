@@ -1,29 +1,36 @@
-FROM python:3.9-slim
+FROM python:3.9
 
 WORKDIR /app
 
 # Install system dependencies
-RUN apt-get update && apt-get install -y \
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
     build-essential \
-    libpq-dev \
     && rm -rf /var/lib/apt/lists/*
 
-# Set pip cache directory and configuration
-ENV PIP_CACHE_DIR=/root/.cache/pip
-ENV PIP_NO_CACHE_DIR=false
-ENV PIP_TIMEOUT=1000
-ENV PIP_RETRIES=10
+# Set environment variables
+ENV PYTHONDONTWRITEBYTECODE=1
+ENV PYTHONUNBUFFERED=1
+ENV MODEL_DIR=/app/models
+ENV TWITTER_API_KEY=dummy
+ENV FACEBOOK_ACCESS_TOKEN=dummy
+ENV LINKEDIN_USERNAME=dummy
 
-# Install Python dependencies using the cache
+# Install Python dependencies
 COPY requirements.txt .
-RUN --mount=type=cache,target=/root/.cache/pip,id=pip_cache \
-    pip install --cache-dir=/root/.cache/pip -r requirements.txt
+RUN pip install --no-cache-dir -r requirements.txt
 
-# Install development tools (also using cache)
-RUN --mount=type=cache,target=/root/.cache/pip,id=pip_cache \
-    pip install --cache-dir=/root/.cache/pip watchdog[watchmedo]
+# Install spaCy model
+RUN python -m spacy download en_core_web_sm
 
-# Source code will be mounted as a volume
+# Create model directory
+RUN mkdir -p /app/models
+
+# Copy project files
+COPY . .
+
+# Expose port
 EXPOSE 8000
 
-CMD ["python", "manage.py", "runserver", "0.0.0.0:8000"] 
+# Run the development server
+CMD ["python", "manage.py", "runserver", "0.0.0.0:8000"]

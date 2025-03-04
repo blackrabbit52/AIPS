@@ -24,21 +24,22 @@ services:
     build: 
       context: ./backend/analysis
       dockerfile: Dockerfile.dev
-      cache_from:
-        - analysis_cache
     volumes:
       - ./backend/analysis:/app:delegated
       - pip_cache:/root/.cache/pip:cached
       - analysis_venv:/app/venv:cached
-      - analysis_cache:/root/.cache:cached
+      - nltk_data:/root/nltk_data:cached
+      - spacy_data:/usr/local/lib/python3.9/site-packages/spacy/data:cached
     environment:
       - PYTHONUNBUFFERED=1
       - DJANGO_SETTINGS_MODULE=analysis.settings
       - DATABASE_URL=postgresql://postgres:postgres@analysis-db:5432/analysis
       - DEBUG=1
       - DJANGO_DEVELOPMENT=1
-      - PIP_CACHE_DIR=/root/.cache/pip
-      - PIP_NO_CACHE_DIR=false
+      - MODEL_DIR=/app/models
+      - TWITTER_API_KEY=dummy
+      - FACEBOOK_ACCESS_TOKEN=dummy
+      - LINKEDIN_USERNAME=dummy
     ports:
       - "8000:8000"
     command: python manage.py runserver 0.0.0.0:8000
@@ -50,12 +51,9 @@ services:
     build: 
       context: ./backend/authentication
       dockerfile: Dockerfile.dev
-      cache_from:
-        - authentication_cache
     volumes:
       - ./backend/authentication:/app:delegated
       - maven_cache:/root/.m2:cached
-      - authentication_cache:/root/.cache:cached
     environment:
       - SPRING_PROFILES_ACTIVE=dev
       - DATABASE_URL=jdbc:postgresql://auth-db:5432/auth
@@ -70,13 +68,10 @@ services:
     build: 
       context: ./backend/recommendation
       dockerfile: Dockerfile.dev
-      cache_from:
-        - recommendation_cache
     volumes:
       - ./backend/recommendation:/app:delegated
       - pip_cache:/root/.cache/pip:cached
       - recommendation_venv:/app/venv:cached
-      - recommendation_cache:/root/.cache:cached
     environment:
       - FLASK_ENV=development
       - FLASK_APP=app
@@ -94,22 +89,24 @@ services:
   aips:
     build: 
       context: ./aips
-      dockerfile: Dockerfile
+      dockerfile: Dockerfile.dev
+      args:
+        BUILDKIT_INLINE_CACHE: 1
     volumes:
-      - ./aips:/app
-      - /app/node_modules
+      - ./aips:/app:delegated
+      - node_modules:/app/node_modules:cached
+      - npm_cache:/root/.npm:cached
+      - aips_cache:/app/.cache:cached
     environment:
       - NODE_ENV=development
       - CHOKIDAR_USEPOLLING=true
       - WATCHPACK_POLLING=true
       - FAST_REFRESH=true
+      - NPM_CONFIG_CACHE=/root/.npm
+      - DOCKER_BUILDKIT=1
     ports:
       - "3000:3000"
     stdin_open: true
-    command: >
-      sh -c "mkdir -p /app/node_modules/.cache &&
-             chmod -R 777 /app/node_modules/.cache &&
-             WATCHPACK_POLLING=true npm start"
 
   # Databases
   analysis-db:
@@ -170,7 +167,9 @@ volumes:
   node_modules:
   analysis_venv:
   recommendation_venv:
-  analysis_cache:
-  authentication_cache:
-  recommendation_cache:
-  aips_cache: 
+  aips_cache:
+    driver: local
+  nltk_data:
+    driver: local
+  spacy_data:
+    driver: local 

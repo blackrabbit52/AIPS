@@ -27,7 +27,7 @@ def calculate_team_role_recommendation(personality_traits):
     # Créer une nouvelle recommandation pour le meilleur rôle
     best_role, best_score = scores[0]
     recommendation = Recommendation(
-        user_id=1,  # TODO: Utiliser l'ID de l'utilisateur réel
+        user_id=1,  # TODO: Use actual user ID from request
         role_id=best_role.id,
         personality_traits=personality_traits,
         score=float(best_score)

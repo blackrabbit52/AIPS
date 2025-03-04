@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import PersonalityAnalysis, TrainingData, TrainedModel
+from .models import PersonalityAnalysis, TrainingData, TrainedModel, Dataset
 
 class PersonalityAnalysisSerializer(serializers.ModelSerializer):
     """Serializer for personality analysis results."""
@@ -7,24 +7,23 @@ class PersonalityAnalysisSerializer(serializers.ModelSerializer):
     class Meta:
         model = PersonalityAnalysis
         fields = [
-            'id', 'raw_text', 'social_network', 'username',
-            'mbti_type', 'mbti_confidence',
-            'openness', 'conscientiousness', 'extraversion',
-            'agreeableness', 'neuroticism',
-            'report', 'created_at', 'updated_at'
+            'id', 'user_id', 'social_platform', 'username',
+            'analysis_date', 'date_range_start', 'date_range_end',
+            'posts_analyzed', 'mbti_type', 'mbti_scores',
+            'ocean_scores', 'confidence_score', 'interpretation',
+            'recommended_roles', 'raw_text_analyzed', 'model_versions'
         ]
         read_only_fields = [
-            'mbti_type', 'mbti_confidence',
-            'openness', 'conscientiousness', 'extraversion',
-            'agreeableness', 'neuroticism',
-            'report', 'created_at', 'updated_at'
+            'analysis_date', 'confidence_score', 'interpretation',
+            'recommended_roles', 'model_versions'
         ]
 
 class TextAnalysisRequestSerializer(serializers.Serializer):
     """Serializer for text analysis requests."""
     
     text = serializers.CharField(
-        help_text="The text to analyze for personality traits."
+        help_text="The text to analyze for personality traits.",
+        required=True
     )
 
 class PostsAnalysisRequestSerializer(serializers.Serializer):
@@ -38,20 +37,13 @@ class PostsAnalysisRequestSerializer(serializers.Serializer):
 class SocialMediaAnalysisRequestSerializer(serializers.Serializer):
     """Serializer for social media analysis requests."""
     
-    SOCIAL_NETWORKS = [
-        ('twitter', 'Twitter'),
-        ('facebook', 'Facebook'),
-        ('linkedin', 'LinkedIn'),
-        ('instagram', 'Instagram'),
-    ]
-    
-    social_network = serializers.ChoiceField(
-        choices=SOCIAL_NETWORKS,
-        help_text="Social network to analyze posts from."
+    username = serializers.CharField(required=True)
+    platform = serializers.ChoiceField(
+        choices=['twitter', 'linkedin', 'facebook'],
+        required=True
     )
-    username = serializers.CharField(
-        help_text="Username of the account to analyze."
-    )
+    start_date = serializers.DateField(required=True)
+    end_date = serializers.DateField(required=False)
 
 class TrainingDataSerializer(serializers.ModelSerializer):
     """Serializer for training datasets."""
@@ -65,17 +57,35 @@ class TrainingDataSerializer(serializers.ModelSerializer):
         ]
         read_only_fields = ['uploaded_at', 'last_used']
 
+class DatasetSerializer(serializers.ModelSerializer):
+    """
+    Serializer for Dataset model
+    """
+    class Meta:
+        model = Dataset
+        fields = [
+            'id', 'name', 'source', 'dataset_id', 'local_path',
+            'size', 'download_date', 'last_used', 'metadata'
+        ]
+        read_only_fields = [
+            'download_date', 'last_used', 'size', 'local_path'
+        ]
+
 class TrainedModelSerializer(serializers.ModelSerializer):
     """Serializer for trained models."""
     
+    datasets_used = DatasetSerializer(many=True, read_only=True)
+
     class Meta:
         model = TrainedModel
         fields = [
-            'id', 'model_type', 'version',
-            'file_path', 'metrics', 'is_active',
-            'training_data', 'created_at', 'last_used'
+            'id', 'name', 'model_type', 'version', 'local_path',
+            'training_date', 'last_used', 'metrics', 'parameters',
+            'datasets_used'
         ]
-        read_only_fields = ['created_at', 'last_used']
+        read_only_fields = [
+            'training_date', 'last_used', 'local_path', 'version'
+        ]
 
     def validate(self, data):
         """Validate model data."""
@@ -95,3 +105,26 @@ class TrainedModelSerializer(serializers.ModelSerializer):
                 )
         
         return data 
+
+class DatasetFetchRequestSerializer(serializers.Serializer):
+    """
+    Serializer for dataset fetch request
+    """
+    dataset_id = serializers.CharField(required=True)
+    source = serializers.ChoiceField(
+        choices=['kaggle'],
+        default='kaggle'
+    )
+
+class ModelTrainingRequestSerializer(serializers.Serializer):
+    """
+    Serializer for model training request
+    """
+    dataset_ids = serializers.ListField(
+        child=serializers.IntegerField(),
+        required=True
+    )
+    model_type = serializers.ChoiceField(
+        choices=['MBTI', 'OCEAN'],
+        required=True
+    ) 
