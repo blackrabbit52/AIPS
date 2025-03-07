@@ -1,4 +1,4 @@
-FROM python:3.9-slim
+FROM python:3.10-slim
 
 WORKDIR /app
 
@@ -8,20 +8,19 @@ RUN apt-get update && apt-get install -y \
     libpq-dev \
     && rm -rf /var/lib/apt/lists/*
 
-# Set pip cache directory and configuration
-ENV PIP_CACHE_DIR=/root/.cache/pip
+# Set environment variables
+ENV PYTHONUNBUFFERED=1
+ENV PYTHONDONTWRITEBYTECODE=1
 ENV PIP_NO_CACHE_DIR=false
 ENV PIP_TIMEOUT=1000
 ENV PIP_RETRIES=10
 
-# Install Python dependencies using the cache
+# Install Python dependencies
 COPY requirements.txt .
-RUN --mount=type=cache,target=/root/.cache/pip \
-    pip install -r requirements.txt
+RUN pip install -r requirements.txt
 
-# Install development tools (also using cache)
-RUN --mount=type=cache,target=/root/.cache/pip \
-    pip install watchdog[watchmedo] python-dotenv
+# Install development tools
+RUN pip install watchdog[watchmedo] python-dotenv
 
 # Configure Flask for development
 ENV FLASK_ENV=development

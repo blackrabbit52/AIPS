@@ -7,7 +7,6 @@ import {
   Card,
   CardContent,
   CardActionArea,
-  Icon,
   useTheme
 } from '@mui/material';
 import {

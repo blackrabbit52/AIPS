@@ -7,10 +7,10 @@ import { Layout } from './components/layout/Layout';
 // Import pages
 import Home from './pages/Home.jsx';
 import Login from './pages/Login.jsx';
-import Register from './pages/Register';
-import Dashboard from './pages/Dashboard';
+import Register from './pages/Register.js';
+import Dashboard from './pages/Dashboard.js';
 import Analysis from './pages/Analysis.jsx';
-import Profile from './pages/Profile';
+import Profile from './pages/Profile.jsx';
 
 function App() {
   const [isDarkMode, setIsDarkMode] = useState(false);

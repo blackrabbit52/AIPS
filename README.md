@@ -566,4 +566,147 @@ curl -X GET http://admin:admin@localhost:3000/api/dashboards/uid/[dashboard-uid]
     > backup/dashboard-$(date +%Y%m%d).json
 ```
 
+## Manual Deployment with Docker
+
+If you prefer not to use Docker Compose or the rebuild scripts, you can build and run each service individually using Docker commands. This section provides the commands for each service.
+
+### Frontend (React)
+```bash
+# Build the frontend image
+docker build -t aips-frontend -f aips/Dockerfile.dev aips
+
+# Run the frontend container
+docker run -it --rm \
+  -p 3000:3000 \
+  -v ${PWD}/aips/src:/app/src \
+  -v ${PWD}/aips/public:/app/public \
+  -e NODE_ENV=development \
+  -e CHOKIDAR_USEPOLLING=true \
+  -e WATCHPACK_POLLING=true \
+  aips-frontend
+```
+
+### Analysis Service (Django)
+```bash
+# Build the analysis service image
+docker build -t aips-analysis -f backend/analysis/Dockerfile.dev backend/analysis
+
+# Run the analysis service container
+docker run -it --rm \
+  -p 8000:8000 \
+  -v ${PWD}/backend/analysis:/app \
+  -e PYTHONUNBUFFERED=1 \
+  -e DJANGO_SETTINGS_MODULE=analysis.settings \
+  -e DATABASE_URL=postgresql://postgres:postgres@host.docker.internal:5432/analysis \
+  -e DEBUG=1 \
+  aips-analysis
+```
+
+### Authentication Service (Spring Boot)
+```bash
+# Build the authentication service image
+docker build -t aips-auth -f backend/authentication/Dockerfile.dev backend/authentication
+
+# Run the authentication service container
+docker run -it --rm \
+  -p 8080:8080 \
+  -v ${PWD}/backend/authentication:/app \
+  -e SPRING_PROFILES_ACTIVE=dev \
+  -e DATABASE_URL=jdbc:postgresql://host.docker.internal:5433/auth \
+  aips-auth
+```
+
+### Recommendation Service (Flask)
+```bash
+# Build the recommendation service image
+docker build -t aips-recommendation -f backend/recommendation/Dockerfile.dev backend/recommendation
+
+# Run the recommendation service container
+docker run -it --rm \
+  -p 5000:5000 \
+  -v ${PWD}/backend/recommendation:/app \
+  -e FLASK_ENV=development \
+  -e FLASK_APP=app \
+  -e FLASK_DEBUG=1 \
+  -e DATABASE_URL=postgresql://postgres:postgres@host.docker.internal:5434/recommendation \
+  aips-recommendation
+```
+
+### API Gateway (Nginx)
+```bash
+# Build and run the API gateway
+docker run -d --rm \
+  -p 8888:80 \
+  -v ${PWD}/deployment/nginx/nginx.conf:/etc/nginx/nginx.conf:ro \
+  nginx:alpine
+```
+
+### Databases
+
+#### Analysis Database
+```bash
+# Run PostgreSQL for Analysis Service
+docker run -d --rm \
+  -p 5432:5432 \
+  -e POSTGRES_DB=analysis \
+  -e POSTGRES_USER=postgres \
+  -e POSTGRES_PASSWORD=postgres \
+  -v analysis_db_data:/var/lib/postgresql/data \
+  postgres:13-alpine
+```
+
+#### Authentication Database
+```bash
+# Run PostgreSQL for Authentication Service
+docker run -d --rm \
+  -p 5433:5432 \
+  -e POSTGRES_DB=auth \
+  -e POSTGRES_USER=postgres \
+  -e POSTGRES_PASSWORD=postgres \
+  -v auth_db_data:/var/lib/postgresql/data \
+  postgres:13-alpine
+```
+
+#### Recommendation Database
+```bash
+# Run PostgreSQL for Recommendation Service
+docker run -d --rm \
+  -p 5434:5432 \
+  -e POSTGRES_DB=recommendation \
+  -e POSTGRES_USER=postgres \
+  -e POSTGRES_PASSWORD=postgres \
+  -v recommendation_db_data:/var/lib/postgresql/data \
+  postgres:13-alpine
+```
+
+### Additional Services
+
+#### Redis
+```bash
+# Run Redis for caching
+docker run -d --rm \
+  -p 6379:6379 \
+  redis:6-alpine
+```
+
+#### Elasticsearch
+```bash
+# Run Elasticsearch for search
+docker run -d --rm \
+  -p 9200:9200 \
+  -e discovery.type=single-node \
+  -e "ES_JAVA_OPTS=-Xms512m -Xmx512m" \
+  -e bootstrap.memory_lock=true \
+  elasticsearch:7.9.3
+```
+
+### Notes
+- Replace `${PWD}` with `%cd%` on Windows Command Prompt or `${PWD}` with `$(pwd)` on PowerShell
+- Use `host.docker.internal` instead of `localhost` to connect to services running on the host machine
+- All containers use the `--rm` flag to automatically remove them when stopped
+- The `-it` flag is used for interactive containers (frontend and backend services)
+- The `-d` flag is used for background services (databases, Redis, Elasticsearch)
+- Volume mounts are used to enable hot-reloading for development
+- Each service can be customized further by adding or modifying environment variables
+
 

@@ -14,8 +14,7 @@ import {
   InputLabel,
   Select,
   Alert,
-  CircularProgress,
-  useTheme
+  CircularProgress
 } from '@mui/material';
 import { DatePicker } from '@mui/x-date-pickers/DatePicker';
 import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
@@ -29,7 +28,6 @@ import {
 } from '@mui/icons-material';
 
 const Analysis = () => {
-  const theme = useTheme();
   const [activeTab, setActiveTab] = useState(0);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
