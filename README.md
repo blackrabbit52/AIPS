@@ -60,7 +60,114 @@ AIPS is built using a microservices architecture, with the following components:
 - JWT token management
 - OAuth2 integration for social login
 - User profile management
-- Role-based access control
+- Role-based access control (RBAC)
+- Permission-based access control
+- User session management
+- Password encryption with BCrypt
+- Token blacklisting
+- Account verification
+
+##### Authentication Endpoints
+```
+POST /api/v1/auth/signup
+- Register a new user
+- Body: {
+    "username": "string",
+    "email": "string",
+    "password": "string",
+    "firstName": "string",
+    "lastName": "string"
+  }
+- Response: User details with roles and permissions
+
+POST /api/v1/auth/signin
+- Authenticate user
+- Body: {
+    "usernameOrEmail": "string",
+    "password": "string"
+  }
+- Response: JWT token with user details
+
+GET /api/v1/users/check-username-availability
+- Check if username is available
+- Query: ?username=string
+- Response: boolean
+
+GET /api/v1/users/check-email-availability
+- Check if email is available
+- Query: ?email=string
+- Response: boolean
+
+GET /api/v1/users
+- Get all users (admin only)
+- Headers: Authorization: Bearer {token}
+- Response: Array of users
+
+GET /api/v1/users/{id}
+- Get user by ID
+- Headers: Authorization: Bearer {token}
+- Response: User details
+
+PUT /api/v1/users/{id}
+- Update user
+- Headers: Authorization: Bearer {token}
+- Body: User update data
+- Response: Updated user details
+
+DELETE /api/v1/users/{id}
+- Delete user
+- Headers: Authorization: Bearer {token}
+- Response: 200 OK
+```
+
+##### Role Management Endpoints
+```
+GET /api/v1/roles
+- Get all roles
+- Headers: Authorization: Bearer {token}
+- Response: Array of roles
+
+POST /api/v1/roles
+- Create new role
+- Headers: Authorization: Bearer {token}
+- Body: {
+    "name": "string",
+    "description": "string",
+    "permissions": ["string"]
+  }
+- Response: Created role
+
+PUT /api/v1/roles/{id}
+- Update role
+- Headers: Authorization: Bearer {token}
+- Body: Role update data
+- Response: Updated role
+
+DELETE /api/v1/roles/{id}
+- Delete role
+- Headers: Authorization: Bearer {token}
+- Response: 200 OK
+```
+
+##### Default Roles and Permissions
+```
+Roles:
+- ROLE_ADMIN: Full system access
+- ROLE_USER: Basic user access
+- ROLE_ANALYST: Analysis-specific access
+
+Permissions:
+- User Management:
+  - user:create, user:read, user:update, user:delete
+- Role Management:
+  - role:create, role:read, role:update, role:delete
+- Analysis:
+  - analysis:create, analysis:read, analysis:update, analysis:delete
+- Recommendation:
+  - recommendation:create, recommendation:read, recommendation:update, recommendation:delete
+- Admin:
+  - admin:access
+```
 
 #### Analysis Service (Django)
 - Personality analysis algorithms
@@ -281,113 +388,73 @@ Note: After running this command, the next build will take longer as it needs to
 
 ## Development Setup
 
-### Hot Reload Configuration
-All services are configured with hot reload for development:
+### Prerequisites
+- Docker Desktop
+- Git
 
-1. **Frontend (React)**
-- Changes in `./frontend/src` are automatically reflected
-- Environment variables:
-```env
-NODE_ENV=development
-CHOKIDAR_USEPOLLING=true
-WATCHPACK_POLLING=true
+### Getting Started
+
+1. Clone the repository:
+```bash
+git clone https://github.com/yourusername/aips.git
+cd aips
 ```
 
-2. **Analysis Service (Django)**
-- Auto-reloads on Python file changes
-- Debug mode enabled
-- Volume mounted: `./backend/analysis:/app`
+2. Initial Setup:
 
-3. **Authentication Service (Spring)**
-- Spring DevTools enabled
-- Remote debugging on port 5005
-- Volume mounted: `./backend/authentication:/app`
-
-4. **Recommendation Service (Flask)**
-- Flask debug mode enabled
-- Volume mounted: `./backend/recommendation:/app`
-
-### Cache Configuration
-The project uses Docker volume caching to improve build times:
-
-```yaml
-volumes:
-  pip_cache:        # Python packages
-  maven_cache:      # Java packages
-  npm_cache:        # Node.js packages
-  node_modules:     # Frontend dependencies
+For Unix-based systems (Linux/macOS):
+```bash
+chmod +x scripts/*.sh
+./scripts/setup.sh
 ```
+
+For Windows:
+```powershell
+.\scripts\setup.ps1
+```
+
+3. Start Development Environment:
+
+For Unix-based systems (Linux/macOS):
+```bash
+./scripts/dev.sh
+```
+
+For Windows:
+```powershell
+.\scripts\dev.ps1
+```
+
+The development environment will start with:
+- Frontend (React) at http://localhost:3000
+- Authentication Service at http://localhost:8080
+- PostgreSQL Database at localhost:5433
+
+### Development Workflow
+
+- The frontend code in `./aips` directory is mounted as a volume, so changes will automatically trigger hot-reload
+- The authentication service in `./backend/authentication` is also mounted as a volume for live development
+- Database data persists in `./data/postgres/auth`
+- Node modules are stored in a named volume for better performance
+- Maven repository is cached in a named volume for faster builds
 
 ### Troubleshooting
 
-#### Windows-specific issues
-1. **Line endings**
+If you encounter any issues:
+
+1. Ensure Docker Desktop is running
+2. Clean up Docker resources:
 ```bash
-# Configure Git to handle line endings
-git config --global core.autocrlf input
+docker-compose down --volumes --remove-orphans
+docker system prune -af
 ```
-
-2. **WSL2 memory issues**
-Create `.wslconfig` in your Windows home directory:
-```
-[wsl2]
-memory=6GB
-processors=4
-```
-
-3. **Docker Desktop settings**
-- Enable WSL2 backend
-- Allocate sufficient resources (CPU/Memory)
-- Enable BuildKit
-
-#### macOS-specific issues
-1. **Resource limits**
-- Increase Docker Desktop memory allocation
-- Configure CPU limits in Docker Desktop preferences
-
-2. **File sharing**
-- Ensure project directory is in Docker Desktop file sharing paths
-
-#### Linux-specific issues
-1. **Permissions**
+3. Remove data directories:
 ```bash
-# Add user to docker group
-sudo usermod -aG docker $USER
-newgrp docker
+rm -rf data/*  # Unix
+Remove-Item -Recurse -Force data/*  # Windows
 ```
-
-2. **Resource limits**
-```bash
-# Increase virtual memory for Elasticsearch
-sudo sysctl -w vm.max_map_count=262144
-```
-
-### Common Issues
-
-1. **Services not starting**
-```bash
-# Check service logs
-docker-compose logs [service_name]
-
-# Rebuild specific service
-docker-compose build [service_name]
-docker-compose up -d [service_name]
-```
-
-2. **Cache issues**
-```bash
-# Clear specific cache
-docker-compose down -v
-./scripts/rebuild.sh
-```
-
-3. **Port conflicts**
-```bash
-# Check ports in use
-netstat -tulpn | grep LISTEN
-
-# Modify ports in docker-compose.yml if needed
-```
+4. Run setup script again
+5. Start development environment
 
 ## Monitoring
 
@@ -566,147 +633,346 @@ curl -X GET http://admin:admin@localhost:3000/api/dashboards/uid/[dashboard-uid]
     > backup/dashboard-$(date +%Y%m%d).json
 ```
 
-## Manual Deployment with Docker
+## Docker Deployment
 
-If you prefer not to use Docker Compose or the rebuild scripts, you can build and run each service individually using Docker commands. This section provides the commands for each service.
+### Prerequisites
+- Docker Desktop installed and running
+- Docker Compose v2 or later
 
-### Frontend (React)
-```bash
-# Build the frontend image
-docker build -t aips-frontend -f aips/Dockerfile.dev aips
+### Development Setup
 
-# Run the frontend container
-docker run -it --rm \
-  -p 3000:3000 \
-  -v ${PWD}/aips/src:/app/src \
-  -v ${PWD}/aips/public:/app/public \
-  -e NODE_ENV=development \
-  -e CHOKIDAR_USEPOLLING=true \
-  -e WATCHPACK_POLLING=true \
-  aips-frontend
+#### Windows
+```powershell
+# Initial setup
+.\scripts\setup.ps1
+
+# Start services
+docker-compose up --build aips auth-service
 ```
 
-### Analysis Service (Django)
+#### Linux/MacOS
 ```bash
-# Build the analysis service image
-docker build -t aips-analysis -f backend/analysis/Dockerfile.dev backend/analysis
+# Initial setup
+chmod +x ./scripts/setup.sh
+./scripts/setup.sh
 
-# Run the analysis service container
-docker run -it --rm \
-  -p 8000:8000 \
-  -v ${PWD}/backend/analysis:/app \
-  -e PYTHONUNBUFFERED=1 \
-  -e DJANGO_SETTINGS_MODULE=analysis.settings \
-  -e DATABASE_URL=postgresql://postgres:postgres@host.docker.internal:5432/analysis \
-  -e DEBUG=1 \
-  aips-analysis
+# Start services
+docker-compose up --build aips auth-service
 ```
 
-### Authentication Service (Spring Boot)
-```bash
-# Build the authentication service image
-docker build -t aips-auth -f backend/authentication/Dockerfile.dev backend/authentication
+### Volume Management
+The project uses Docker volumes for data persistence:
+- `./data/postgres/auth`: Authentication service database
+- `./data/postgres/analysis`: Analysis service database
+- `./data/postgres/recommendation`: Recommendation service database
+- `./data/elasticsearch`: Elasticsearch data
+- `./data/redis`: Redis data
 
-# Run the authentication service container
-docker run -it --rm \
-  -p 8080:8080 \
-  -v ${PWD}/backend/authentication:/app \
-  -e SPRING_PROFILES_ACTIVE=dev \
-  -e DATABASE_URL=jdbc:postgresql://host.docker.internal:5433/auth \
-  aips-auth
+### Development Notes
+- Hot reloading is enabled for the frontend (React) application
+- The frontend is accessible at http://localhost:3000
+- The authentication service API is accessible at http://localhost:8080
+- The authentication database is accessible at localhost:5433
+- Environment variables are configured in docker-compose.yml for easy development
+- Data persistence is handled through Docker volumes mapped to ./data directory
+
+### Troubleshooting
+If you encounter any issues:
+1. Stop all containers: `docker-compose down`
+2. Clean up Docker system: `docker system prune -af`
+3. Remove the ./data directory
+4. Run the setup script again
+5. Start the services
+
+## Environment Setup
+
+### Authentication Service Configuration
+Create a `.env` file in the `backend/authentication` directory:
+```bash
+# Database Configuration
+DATABASE_URL=jdbc:postgresql://postgres-auth:5432/auth
+DATABASE_USERNAME=postgres
+DATABASE_PASSWORD=postgres
+
+# JWT Configuration
+JWT_SECRET=your_secure_jwt_secret_key_min_32_chars
+JWT_EXPIRATION=86400000
+
+# Server Configuration
+SERVER_PORT=8080
+SPRING_PROFILES_ACTIVE=prod
+
+# CORS Configuration
+CORS_ALLOWED_ORIGINS=http://localhost:3000
+CORS_ALLOWED_METHODS=GET,POST,PUT,DELETE,OPTIONS
+CORS_ALLOWED_HEADERS=*
+CORS_EXPOSED_HEADERS=Authorization
 ```
 
-### Recommendation Service (Flask)
+### Frontend Configuration
+Update the `.env` file in the `aips` directory to include:
 ```bash
-# Build the recommendation service image
-docker build -t aips-recommendation -f backend/recommendation/Dockerfile.dev backend/recommendation
-
-# Run the recommendation service container
-docker run -it --rm \
-  -p 5000:5000 \
-  -v ${PWD}/backend/recommendation:/app \
-  -e FLASK_ENV=development \
-  -e FLASK_APP=app \
-  -e FLASK_DEBUG=1 \
-  -e DATABASE_URL=postgresql://postgres:postgres@host.docker.internal:5434/recommendation \
-  aips-recommendation
+REACT_APP_API_URL=http://localhost:8080/api/v1
+REACT_APP_NAME=AIPS
+REACT_APP_VERSION=1.0.0
 ```
 
-### API Gateway (Nginx)
+## Testing the Authentication Service
+
+1. **Start the Authentication Service**
 ```bash
-# Build and run the API gateway
-docker run -d --rm \
-  -p 8888:80 \
-  -v ${PWD}/deployment/nginx/nginx.conf:/etc/nginx/nginx.conf:ro \
-  nginx:alpine
+# Using Docker Compose
+docker-compose up auth-service postgres-auth
+
+# Check service health
+curl http://localhost:8080/api/v1/actuator/health
 ```
 
-### Databases
-
-#### Analysis Database
+2. **Register a New User**
 ```bash
-# Run PostgreSQL for Analysis Service
-docker run -d --rm \
-  -p 5432:5432 \
-  -e POSTGRES_DB=analysis \
-  -e POSTGRES_USER=postgres \
-  -e POSTGRES_PASSWORD=postgres \
-  -v analysis_db_data:/var/lib/postgresql/data \
-  postgres:13-alpine
+curl -X POST http://localhost:8080/api/v1/auth/signup \
+  -H "Content-Type: application/json" \
+  -d '{
+    "username": "testuser",
+    "email": "test@example.com",
+    "password": "password123",
+    "firstName": "Test",
+    "lastName": "User"
+  }'
 ```
 
-#### Authentication Database
+3. **Login**
 ```bash
-# Run PostgreSQL for Authentication Service
-docker run -d --rm \
-  -p 5433:5432 \
-  -e POSTGRES_DB=auth \
-  -e POSTGRES_USER=postgres \
-  -e POSTGRES_PASSWORD=postgres \
-  -v auth_db_data:/var/lib/postgresql/data \
-  postgres:13-alpine
+curl -X POST http://localhost:8080/api/v1/auth/signin \
+  -H "Content-Type: application/json" \
+  -d '{
+    "usernameOrEmail": "testuser",
+    "password": "password123"
+  }'
 ```
 
-#### Recommendation Database
+## Testing Individual Services
+
+### Authentication Service
+
+To test the authentication service independently:
+
 ```bash
-# Run PostgreSQL for Recommendation Service
-docker run -d --rm \
-  -p 5434:5432 \
-  -e POSTGRES_DB=recommendation \
-  -e POSTGRES_USER=postgres \
-  -e POSTGRES_PASSWORD=postgres \
-  -v recommendation_db_data:/var/lib/postgresql/data \
-  postgres:13-alpine
+# For Unix-based systems (Linux/macOS)
+chmod +x scripts/deploy-auth.sh
+./scripts/deploy-auth.sh
+
+# For Windows (PowerShell)
+.\scripts\deploy-auth.sh
 ```
 
-### Additional Services
+#### Available Endpoints
 
-#### Redis
-```bash
-# Run Redis for caching
-docker run -d --rm \
-  -p 6379:6379 \
-  redis:6-alpine
+1. Authentication
+```
+POST /api/v1/auth/signup
+- Register new user
+- Body: {
+    "username": "string",
+    "email": "string",
+    "password": "string",
+    "firstName": "string",
+    "lastName": "string"
+  }
+
+POST /api/v1/auth/signin
+- Authenticate user
+- Body: {
+    "usernameOrEmail": "string",
+    "password": "string"
+  }
 ```
 
-#### Elasticsearch
-```bash
-# Run Elasticsearch for search
-docker run -d --rm \
-  -p 9200:9200 \
-  -e discovery.type=single-node \
-  -e "ES_JAVA_OPTS=-Xms512m -Xmx512m" \
-  -e bootstrap.memory_lock=true \
-  elasticsearch:7.9.3
+2. User Management
+```
+GET /api/v1/users/check-username-availability?username=string
+GET /api/v1/users/check-email-availability?email=string
+GET /api/v1/users
+GET /api/v1/users/{id}
+PUT /api/v1/users/{id}
+DELETE /api/v1/users/{id}
 ```
 
-### Notes
-- Replace `${PWD}` with `%cd%` on Windows Command Prompt or `${PWD}` with `$(pwd)` on PowerShell
-- Use `host.docker.internal` instead of `localhost` to connect to services running on the host machine
-- All containers use the `--rm` flag to automatically remove them when stopped
-- The `-it` flag is used for interactive containers (frontend and backend services)
-- The `-d` flag is used for background services (databases, Redis, Elasticsearch)
-- Volume mounts are used to enable hot-reloading for development
-- Each service can be customized further by adding or modifying environment variables
+#### Testing with cURL
+
+1. Register a new user:
+```bash
+curl -X POST http://localhost:8080/api/v1/auth/signup \
+  -H "Content-Type: application/json" \
+  -d '{
+    "username": "testuser",
+    "email": "test@example.com",
+    "password": "password123",
+    "firstName": "Test",
+    "lastName": "User"
+  }'
+```
+
+2. Sign in:
+```bash
+curl -X POST http://localhost:8080/api/v1/auth/signin \
+  -H "Content-Type: application/json" \
+  -d '{
+    "usernameOrEmail": "testuser",
+    "password": "password123"
+  }'
+```
+
+3. Check username availability:
+```bash
+curl http://localhost:8080/api/v1/users/check-username-availability?username=testuser
+```
+
+#### Development Notes
+
+- The authentication service runs on port 8080
+- PostgreSQL database runs on port 5433
+- Remote debugging is enabled on port 5005
+- Swagger UI is available at http://localhost:8080/swagger-ui.html
+- Spring Boot Actuator endpoints are available at http://localhost:8080/actuator
+
+├───aips
+│   ├───.cache
+│   ├───node_modules
+│   ├───public
+│   └───src
+│       ├───assets
+│       ├───components
+│       │   ├───common
+│       │   └───layout
+│       ├───pages
+│       ├───services
+│       ├───store
+│       │   └───slices
+│       └───theme
+├───backend
+│   ├───analysis
+│   │   ├───analysis
+│   │   │   └───__pycache__
+│   │   ├───data
+│   │   │   ├───datasets
+│   │   │   └───models
+│   │   ├───personality_analyzer
+│   │   │   └───__pycache__
+│   │   └───venv
+│   ├───authentication
+│   │   ├───.mvn
+│   │   │   └───wrapper
+│   │   ├───src
+│   │   │   ├───main
+│   │   │   │   ├───java
+│   │   │   │   │   └───com
+│   │   │   │   │       └───aips
+│   │   │   │   │           └───authentication
+│   │   │   │   │               ├───config
+│   │   │   │   │               ├───controller
+│   │   │   │   │               ├───dto
+│   │   │   │   │               ├───exception
+│   │   │   │   │               ├───model
+│   │   │   │   │               │   └───audit
+│   │   │   │   │               ├───repository
+│   │   │   │   │               ├───security
+│   │   │   │   │               └───service
+│   │   │   │   └───resources
+│   │   │   └───test
+│   │   │       └───java
+│   │   │           └───com
+│   │   │               └───aips
+│   │   │                   └───authentication
+│   │   │                       └───service
+│   │   └───target
+│   │       ├───classes
+│   │       │   └───com
+│   │       │       └───aips
+│   │       │           └───authentication
+│   │       │               ├───config
+│   │       │               ├───controller
+│   │       │               ├───dto
+│   │       │               ├───exception
+│   │       │               ├───model
+│   │       │               │   └───audit
+│   │       │               ├───repository
+│   │       │               ├───security
+│   │       │               └───service
+│   │       ├───generated-sources
+│   │       │   └───annotations
+│   │       ├───generated-test-sources
+│   │       │   └───test-annotations
+│   │       ├───maven-archiver
+│   │       ├───maven-status
+│   │       │   └───maven-compiler-plugin
+│   │       │       ├───compile
+│   │       │       │   └───default-compile
+│   │       │       └───testCompile
+│   │       │           └───default-testCompile
+│   │       └───test-classes
+│   │           └───com
+│   │               └───aips
+│   │                   └───authentication
+│   │                       └───service
+│   └───recommendation
+│       ├───app
+│       │   └───__pycache__
+│       ├───migrations
+│       │   ├───versions
+│       │   │   └───__pycache__
+│       │   └───__pycache__
+│       └───venv
+├───Data
+│   ├───elasticsearch
+│   ├───models
+│   ├───postgres
+│   │   ├───analysis
+│   │   ├───auth
+│   │   └───recommendation
+│   ├───processed
+│   ├───raw
+│   └───redis
+├───deployment
+│   ├───kubernetes
+│   └───nginx
+│       └───ssl
+├───monitoring
+│   ├───grafana
+│   │   └───provisioning
+│   │       ├───dashboards
+│   │       └───datasources
+│   ├───logstash
+│   │   ├───config
+│   │   └───pipeline
+│   └───prometheus
+│       └───rules
+└───scripts
 
 
+backend/
+├── src/main/java/com/aips/authentication/
+│   ├── controller/
+│   │   └── AuthController.java
+│   ├── dto/
+│   │   ├── SignInRequest.java
+│   │   ├── SignUpRequest.java
+│   │   └── JwtAuthenticationResponse.java
+│   ├── model/
+│   │   ├── User.java
+│   │   ├── Role.java
+│   │   └── RoleType.java
+│   ├── repository/
+│   │   ├── UserRepository.java
+│   │   └── RoleRepository.java
+│   ├── security/
+│   │   ├── JwtTokenProvider.java
+│   │   └── UserPrincipal.java
+│   ├── service/
+│   │   ├── AuthenticationService.java
+│   │   └── UserService.java
+│   └── AuthenticationApplication.java
+├── src/main/resources/
+│   └── application.yml
+├── Dockerfile
+└── pom.xml

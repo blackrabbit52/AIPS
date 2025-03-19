@@ -1,0 +1,21 @@
+version: '3.8'
+services:
+  frontend:
+    # Build configuration for frontend service
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    # Port mapping for development server
+    ports:
+      - "3000:3000"
+    # Volume configuration for hot reloading
+    volumes:
+      - .:/app
+      - /app/node_modules
+    # Environment variables for development
+    environment:
+      - NODE_ENV=development
+      - CHOKIDAR_USEPOLLING=true
+      - WATCHPACK_POLLING=true
+      - FAST_REFRESH=true
+      - REACT_APP_API_URL=http://localhost:8080/api/v1 

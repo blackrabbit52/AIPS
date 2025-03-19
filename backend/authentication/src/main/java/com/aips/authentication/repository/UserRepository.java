@@ -1,6 +1,7 @@
 package com.aips.authentication.repository;
 
 import com.aips.authentication.model.User;
+import com.aips.authentication.model.Role;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 import java.util.Optional;
@@ -25,12 +26,21 @@ public interface UserRepository extends JpaRepository<User, Long> {
     Optional<User> findByEmail(String email);
     
     /**
+     * Find a user by their username or email address.
+     *
+     * @param username Username to search for
+     * @param email Email to search for
+     * @return Optional containing the user if found
+     */
+    Optional<User> findByUsernameOrEmail(String username, String email);
+    
+    /**
      * Check if a user exists with the given username.
      *
      * @param username Username to check
      * @return true if user exists, false otherwise
      */
-    boolean existsByUsername(String username);
+    Boolean existsByUsername(String username);
     
     /**
      * Check if a user exists with the given email.
@@ -38,5 +48,13 @@ public interface UserRepository extends JpaRepository<User, Long> {
      * @param email Email to check
      * @return true if user exists, false otherwise
      */
-    boolean existsByEmail(String email);
+    Boolean existsByEmail(String email);
+    
+    /**
+     * Check if a user exists with the given role name.
+     *
+     * @param name Role name to check
+     * @return true if user exists, false otherwise
+     */
+    Boolean existsByRoles_Name(Role.RoleType name);
 } 

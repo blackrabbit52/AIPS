@@ -11,16 +11,11 @@ ENV CHOKIDAR_USEPOLLING=true
 ENV WATCHPACK_POLLING=true
 ENV FAST_REFRESH=true
 
-# Create cache directories with correct permissions
-RUN mkdir -p /app/node_modules/.cache && \
-    chmod -R 777 /app/node_modules/.cache
-
 # Copy package files
 COPY package*.json ./
 
 # Install dependencies
-RUN npm install --legacy-peer-deps && \
-    npm install ajv ajv-keywords --legacy-peer-deps
+RUN npm install --legacy-peer-deps
 
 # Copy source code
 COPY . .

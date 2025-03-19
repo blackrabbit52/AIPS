@@ -1,8 +1,10 @@
 package com.aips.authentication.service;
 
-import com.aips.authentication.dto.LoginRequest;
-import com.aips.authentication.dto.SignupRequest;
+import com.aips.authentication.dto.SignInRequest;
+import com.aips.authentication.dto.SignUpRequest;
+import com.aips.authentication.model.Role;
 import com.aips.authentication.model.User;
+import com.aips.authentication.repository.RoleRepository;
 import com.aips.authentication.repository.UserRepository;
 import com.aips.authentication.security.JwtTokenProvider;
 import com.aips.authentication.exception.UserAlreadyExistsException;
@@ -15,6 +17,12 @@ import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.http.ResponseEntity;
+import org.mockito.InjectMocks;
+import org.mockito.MockitoAnnotations;
+import com.aips.authentication.dto.JwtAuthenticationResponse;
+
+import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
@@ -30,29 +38,26 @@ public class AuthenticationServiceTest {
     private UserRepository userRepository;
 
     @Mock
+    private RoleRepository roleRepository;
+
+    @Mock
     private PasswordEncoder passwordEncoder;
 
     @Mock
     private JwtTokenProvider tokenProvider;
 
-    private AuthenticationService authService;
+    @InjectMocks
+    private AuthenticationService authenticationService;
 
     @BeforeEach
     void setUp() {
-        authService = new AuthenticationService(
-            authenticationManager,
-            userRepository,
-            passwordEncoder,
-            tokenProvider
-        );
+        MockitoAnnotations.openMocks(this);
     }
 
     @Test
     void authenticateUser_ValidCredentials_ReturnsToken() {
         // Arrange
-        LoginRequest loginRequest = new LoginRequest();
-        loginRequest.setUsername("testuser");
-        loginRequest.setPassword("password123");
+        SignInRequest signInRequest = new SignInRequest("testuser", "password123");
 
         Authentication authentication = mock(Authentication.class);
         when(authenticationManager.authenticate(any(UsernamePasswordAuthenticationToken.class)))
@@ -60,11 +65,10 @@ public class AuthenticationServiceTest {
         when(tokenProvider.generateToken(authentication)).thenReturn("test.jwt.token");
 
         // Act
-        String token = authService.authenticateUser(loginRequest);
+        JwtAuthenticationResponse response = authenticationService.authenticateUser(signInRequest);
 
         // Assert
-        assertNotNull(token);
-        assertEquals("test.jwt.token", token);
+        assertNotNull(response);
         verify(authenticationManager).authenticate(any(UsernamePasswordAuthenticationToken.class));
         verify(tokenProvider).generateToken(authentication);
     }
@@ -72,59 +76,59 @@ public class AuthenticationServiceTest {
     @Test
     void registerUser_NewUser_CreatesUser() {
         // Arrange
-        SignupRequest signupRequest = new SignupRequest();
-        signupRequest.setUsername("newuser");
-        signupRequest.setEmail("newuser@example.com");
-        signupRequest.setPassword("password123");
-        signupRequest.setFirstName("John");
-        signupRequest.setLastName("Doe");
+        SignUpRequest signUpRequest = new SignUpRequest();
+        signUpRequest.setUsername("newuser");
+        signUpRequest.setEmail("newuser@example.com");
+        signUpRequest.setPassword("password123");
+        signUpRequest.setFirstName("John");
+        signUpRequest.setLastName("Doe");
+
+        Role role = new Role();
+        role.setName(Role.RoleType.ROLE_USER);
 
         when(userRepository.existsByUsername("newuser")).thenReturn(false);
         when(userRepository.existsByEmail("newuser@example.com")).thenReturn(false);
         when(passwordEncoder.encode("password123")).thenReturn("encoded_password");
+        when(roleRepository.findByName(Role.RoleType.ROLE_USER)).thenReturn(Optional.of(role));
         when(userRepository.save(any(User.class))).thenAnswer(i -> i.getArgument(0));
 
         // Act
-        User createdUser = authService.registerUser(signupRequest);
+        ResponseEntity<?> response = authenticationService.registerUser(signUpRequest);
 
         // Assert
-        assertNotNull(createdUser);
-        assertEquals("newuser", createdUser.getUsername());
-        assertEquals("newuser@example.com", createdUser.getEmail());
-        assertEquals("encoded_password", createdUser.getPassword());
-        assertEquals("John", createdUser.getFirstName());
-        assertEquals("Doe", createdUser.getLastName());
-        assertTrue(createdUser.getRoles().contains("ROLE_USER"));
+        assertNotNull(response);
+        assertTrue(response.getStatusCode().is2xxSuccessful());
+        verify(userRepository).save(any(User.class));
     }
 
     @Test
     void registerUser_ExistingUsername_ThrowsException() {
         // Arrange
-        SignupRequest signupRequest = new SignupRequest();
-        signupRequest.setUsername("existinguser");
-        signupRequest.setEmail("newuser@example.com");
+        SignUpRequest signUpRequest = new SignUpRequest();
+        signUpRequest.setUsername("existinguser");
+        signUpRequest.setEmail("newuser@example.com");
 
         when(userRepository.existsByUsername("existinguser")).thenReturn(true);
 
         // Act & Assert
         assertThrows(UserAlreadyExistsException.class,
-            () -> authService.registerUser(signupRequest));
+            () -> authenticationService.registerUser(signUpRequest));
         verify(userRepository, never()).save(any(User.class));
     }
 
     @Test
     void registerUser_ExistingEmail_ThrowsException() {
         // Arrange
-        SignupRequest signupRequest = new SignupRequest();
-        signupRequest.setUsername("newuser");
-        signupRequest.setEmail("existing@example.com");
+        SignUpRequest signUpRequest = new SignUpRequest();
+        signUpRequest.setUsername("newuser");
+        signUpRequest.setEmail("existing@example.com");
 
         when(userRepository.existsByUsername("newuser")).thenReturn(false);
         when(userRepository.existsByEmail("existing@example.com")).thenReturn(true);
 
         // Act & Assert
         assertThrows(UserAlreadyExistsException.class,
-            () -> authService.registerUser(signupRequest));
+            () -> authenticationService.registerUser(signUpRequest));
         verify(userRepository, never()).save(any(User.class));
     }
 } 

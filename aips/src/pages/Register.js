@@ -8,10 +8,14 @@ import {
   Button,
   Link,
   Alert,
-  Grid
+  Grid,
+  CircularProgress
 } from '@mui/material';
 import { styled } from '@mui/material/styles';
 import { Link as RouterLink, useNavigate } from 'react-router-dom';
+import * as yup from 'yup';
+import { useFormik } from 'formik';
+import authService from '../services/auth.service';
 
 const StyledPaper = styled(Paper)(({ theme }) => ({
   padding: theme.spacing(4),
@@ -22,48 +26,72 @@ const StyledPaper = styled(Paper)(({ theme }) => ({
   alignItems: 'center'
 }));
 
+const validationSchema = yup.object({
+  firstName: yup
+    .string()
+    .required('First name is required')
+    .max(100, 'First name must be at most 100 characters'),
+  lastName: yup
+    .string()
+    .required('Last name is required')
+    .max(100, 'Last name must be at most 100 characters'),
+  email: yup
+    .string()
+    .email('Please enter a valid email address')
+    .required('Email is required')
+    .max(100, 'Email must be at most 100 characters'),
+  password: yup
+    .string()
+    .required('Password is required')
+    .min(8, 'Password must be at least 8 characters')
+    .max(120, 'Password must be at most 120 characters'),
+  confirmPassword: yup
+    .string()
+    .required('Please confirm your password')
+    .oneOf([yup.ref('password'), null], 'Passwords must match')
+});
+
 const Register = () => {
   const navigate = useNavigate();
-  const [formData, setFormData] = useState({
-    firstName: '',
-    lastName: '',
-    email: '',
-    password: '',
-    confirmPassword: ''
-  });
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
 
-  const handleChange = (e) => {
-    setFormData({
-      ...formData,
-      [e.target.name]: e.target.value
-    });
-  };
+  const formik = useFormik({
+    initialValues: {
+      firstName: '',
+      lastName: '',
+      email: '',
+      password: '',
+      confirmPassword: ''
+    },
+    validationSchema: validationSchema,
+    onSubmit: async (values) => {
+      setIsLoading(true);
+      setError('');
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    setIsLoading(true);
-    setError('');
+      try {
+        // Call the registration service with explicit URL
+        await authService.register({
+          firstName: values.firstName,
+          lastName: values.lastName,
+          email: values.email,
+          password: values.password,
+          _forceUrl: true  // Flag to force using direct URL without /v1
+        });
 
-    if (formData.password !== formData.confirmPassword) {
-      setError('Passwords do not match');
-      setIsLoading(false);
-      return;
+        // Redirect to login page after successful registration
+        navigate('/login', { 
+          state: { 
+            message: 'Registration successful! Please login with your credentials.' 
+          } 
+        });
+      } catch (err) {
+        setError(err.message || 'Registration failed. Please try again.');
+      } finally {
+        setIsLoading(false);
+      }
     }
-
-    try {
-      // TODO: Implement API call for registration
-      console.log('Registering...', formData);
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      navigate('/login');
-    } catch (err) {
-      setError('Registration failed. Please try again.');
-    } finally {
-      setIsLoading(false);
-    }
-  };
+  });
 
   return (
     <Container component="main" maxWidth="sm">
@@ -78,7 +106,7 @@ const Register = () => {
           </Alert>
         )}
 
-        <Box component="form" onSubmit={handleSubmit} sx={{ width: '100%', mt: 1 }}>
+        <Box component="form" onSubmit={formik.handleSubmit} sx={{ width: '100%', mt: 1 }}>
           <Grid container spacing={2}>
             <Grid item xs={12} sm={6}>
               <TextField
@@ -88,8 +116,11 @@ const Register = () => {
                 label="First Name"
                 name="firstName"
                 autoComplete="given-name"
-                value={formData.firstName}
-                onChange={handleChange}
+                value={formik.values.firstName}
+                onChange={formik.handleChange}
+                error={formik.touched.firstName && Boolean(formik.errors.firstName)}
+                helperText={formik.touched.firstName && formik.errors.firstName}
+                disabled={isLoading}
               />
             </Grid>
             <Grid item xs={12} sm={6}>
@@ -100,8 +131,11 @@ const Register = () => {
                 label="Last Name"
                 name="lastName"
                 autoComplete="family-name"
-                value={formData.lastName}
-                onChange={handleChange}
+                value={formik.values.lastName}
+                onChange={formik.handleChange}
+                error={formik.touched.lastName && Boolean(formik.errors.lastName)}
+                helperText={formik.touched.lastName && formik.errors.lastName}
+                disabled={isLoading}
               />
             </Grid>
             <Grid item xs={12}>
@@ -113,8 +147,11 @@ const Register = () => {
                 name="email"
                 autoComplete="email"
                 type="email"
-                value={formData.email}
-                onChange={handleChange}
+                value={formik.values.email}
+                onChange={formik.handleChange}
+                error={formik.touched.email && Boolean(formik.errors.email)}
+                helperText={formik.touched.email && formik.errors.email}
+                disabled={isLoading}
               />
             </Grid>
             <Grid item xs={12}>
@@ -126,8 +163,11 @@ const Register = () => {
                 type="password"
                 id="password"
                 autoComplete="new-password"
-                value={formData.password}
-                onChange={handleChange}
+                value={formik.values.password}
+                onChange={formik.handleChange}
+                error={formik.touched.password && Boolean(formik.errors.password)}
+                helperText={formik.touched.password && formik.errors.password}
+                disabled={isLoading}
               />
             </Grid>
             <Grid item xs={12}>
@@ -138,8 +178,11 @@ const Register = () => {
                 label="Confirm Password"
                 type="password"
                 id="confirmPassword"
-                value={formData.confirmPassword}
-                onChange={handleChange}
+                value={formik.values.confirmPassword}
+                onChange={formik.handleChange}
+                error={formik.touched.confirmPassword && Boolean(formik.errors.confirmPassword)}
+                helperText={formik.touched.confirmPassword && formik.errors.confirmPassword}
+                disabled={isLoading}
               />
             </Grid>
           </Grid>
@@ -150,7 +193,14 @@ const Register = () => {
             sx={{ mt: 3, mb: 2 }}
             disabled={isLoading}
           >
-            {isLoading ? 'Creating Account...' : 'Sign Up'}
+            {isLoading ? (
+              <>
+                <CircularProgress size={24} sx={{ mr: 1 }} />
+                Creating Account...
+              </>
+            ) : (
+              'Sign Up'
+            )}
           </Button>
           <Box sx={{ textAlign: 'center' }}>
             <Link component={RouterLink} to="/login" variant="body2">

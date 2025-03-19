@@ -1,8 +1,16 @@
 package com.aips.authentication.service;
 
-import com.aips.authentication.dto.SignupRequest;
+import com.aips.authentication.dto.SignUpRequest;
+import com.aips.authentication.dto.UserResponse;
+import com.aips.authentication.exception.ResourceNotFoundException;
+import com.aips.authentication.model.Role;
 import com.aips.authentication.model.User;
+import com.aips.authentication.repository.RoleRepository;
 import com.aips.authentication.repository.UserRepository;
+import com.aips.authentication.security.UserPrincipal;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UserDetailsService;
@@ -11,41 +19,48 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.HashSet;
+import java.util.List;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 @Service
 public class UserService implements UserDetailsService {
 
+    private static final Logger logger = LoggerFactory.getLogger(UserService.class);
+
     private final UserRepository userRepository;
+    private final RoleRepository roleRepository;
     private final PasswordEncoder passwordEncoder;
 
-    public UserService(UserRepository userRepository, PasswordEncoder passwordEncoder) {
+    public UserService(UserRepository userRepository,
+                      RoleRepository roleRepository,
+                      PasswordEncoder passwordEncoder) {
         this.userRepository = userRepository;
+        this.roleRepository = roleRepository;
         this.passwordEncoder = passwordEncoder;
     }
 
     /**
      * Load user by username for Spring Security authentication.
      *
-     * @param username Username to search for
+     * @param usernameOrEmail Username or email to search for
      * @return UserDetails object for Spring Security
      * @throws UsernameNotFoundException if user not found
      */
     @Override
     @Transactional(readOnly = true)
-    public UserDetails loadUserByUsername(String username) throws UsernameNotFoundException {
-        User user = userRepository.findByUsername(username)
-            .orElseThrow(() -> new UsernameNotFoundException("User not found: " + username));
-
-        return org.springframework.security.core.userdetails.User
-            .withUsername(user.getUsername())
-            .password(user.getPassword())
-            .roles(user.getRoles().toArray(new String[0]))
-            .accountExpired(!user.isAccountNonExpired())
-            .accountLocked(!user.isAccountNonLocked())
-            .credentialsExpired(!user.isCredentialsNonExpired())
-            .disabled(!user.isEnabled())
-            .build();
+    public UserDetails loadUserByUsername(String usernameOrEmail) throws UsernameNotFoundException {
+        logger.info("Tentative de chargement de l'utilisateur: {}", usernameOrEmail);
+        
+        User user = userRepository.findByUsernameOrEmail(usernameOrEmail, usernameOrEmail)
+            .orElseThrow(() -> {
+                logger.error("Utilisateur non trouvé: {}", usernameOrEmail);
+                return new UsernameNotFoundException("Utilisateur non trouvé avec le username ou email: " + usernameOrEmail);
+            });
+            
+        logger.info("Utilisateur trouvé: {}", user.getUsername());
+        return UserPrincipal.create(user);
     }
 
     /**
@@ -89,35 +104,6 @@ public class UserService implements UserDetailsService {
     }
 
     /**
-     * Create a new user.
-     *
-     * @param request User registration data
-     * @return Created user
-     * @throws RuntimeException if username or email already exists
-     */
-    @Transactional
-    public User createUser(SignupRequest request) {
-        if (userRepository.existsByUsername(request.getUsername())) {
-            throw new RuntimeException("Username is already taken!");
-        }
-
-        if (userRepository.existsByEmail(request.getEmail())) {
-            throw new RuntimeException("Email is already in use!");
-        }
-
-        User user = new User();
-        user.setUsername(request.getUsername());
-        user.setEmail(request.getEmail());
-        user.setPassword(passwordEncoder.encode(request.getPassword()));
-        user.setFirstName(request.getFirstName());
-        user.setLastName(request.getLastName());
-        user.setRoles(Set.of("ROLE_USER"));
-        user.setEnabled(true);
-
-        return userRepository.save(user);
-    }
-
-    /**
      * Update user profile information.
      *
      * @param user User to update
@@ -130,5 +116,126 @@ public class UserService implements UserDetailsService {
         user.setFirstName(firstName);
         user.setLastName(lastName);
         return userRepository.save(user);
+    }
+
+    public List<UserResponse> getAllUsers() {
+        return userRepository.findAll().stream()
+                .map(this::convertToUserResponse)
+                .collect(Collectors.toList());
+    }
+
+    public UserResponse getUserById(Long id) {
+        return userRepository.findById(id)
+                .map(this::convertToUserResponse)
+                .orElseThrow(() -> new ResourceNotFoundException("User not found with id: " + id));
+    }
+
+    @Transactional
+    public UserResponse updateUser(Long id, UserResponse userRequest) {
+        User user = userRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("User not found with id: " + id));
+
+        user.setFirstName(userRequest.getFirstName());
+        user.setLastName(userRequest.getLastName());
+        user.setEmail(userRequest.getEmail());
+        
+        if (userRequest.getRoles() != null) {
+            Set<Role> roles = userRequest.getRoles().stream()
+                    .map(roleName -> findRoleByName(Role.RoleType.valueOf(roleName)))
+                    .collect(Collectors.toSet());
+            user.setRoles(roles);
+        }
+
+        return convertToUserResponse(userRepository.save(user));
+    }
+
+    @Transactional
+    public void deleteUser(Long id) {
+        if (!userRepository.existsById(id)) {
+            throw new ResourceNotFoundException("User not found with id: " + id);
+        }
+        userRepository.deleteById(id);
+    }
+
+    private UserResponse convertToUserResponse(User user) {
+        return new UserResponse(
+            user.getId(),
+            user.getUsername(),
+            user.getEmail(),
+            user.getFirstName(),
+            user.getLastName(),
+            user.getRoles().stream()
+                .map(role -> role.getName().name())
+                .collect(Collectors.toSet())
+        );
+    }
+
+    public boolean existsSuperAdmin() {
+        return userRepository.existsByRoles_Name(Role.RoleType.ROLE_SUPER_ADMIN);
+    }
+
+    private Role findRoleByName(Role.RoleType roleType) {
+        return roleRepository.findByName(roleType)
+                .orElseThrow(() -> new RuntimeException("Role not found"));
+    }
+
+    public boolean existsByRoleName(Role.RoleType roleType) {
+        return roleRepository.existsByName(roleType);
+    }
+
+    public boolean hasRole(User user, Role.RoleType roleType) {
+        return user.getRoles().stream()
+                .anyMatch(role -> role.getName().equals(roleType));
+    }
+
+    @Transactional
+    public ResponseEntity<?> registerUser(SignUpRequest request) {
+        if (userRepository.existsByUsername(request.getUsername())) {
+            return ResponseEntity.badRequest().body("Username is already taken");
+        }
+        if (userRepository.existsByEmail(request.getEmail())) {
+            return ResponseEntity.badRequest().body("Email is already in use");
+        }
+
+        User user = new User();
+        user.setUsername(request.getUsername());
+        user.setEmail(request.getEmail());
+        user.setPassword(passwordEncoder.encode(request.getPassword()));
+        user.setFirstName(request.getFirstName());
+        user.setLastName(request.getLastName());
+
+        Set<Role> roles = new HashSet<>();
+        roles.add(Role.createDefaultUserRole());
+        user.setRoles(roles);
+
+        User result = userRepository.save(user);
+        
+        return ResponseEntity.ok(convertToUserResponse(result));
+    }
+
+    @Transactional
+    public ResponseEntity<?> registerSuperAdmin(SignUpRequest request) {
+        if (userRepository.existsByUsername(request.getUsername())) {
+            return ResponseEntity.badRequest().body("Username is already taken");
+        }
+        if (userRepository.existsByEmail(request.getEmail())) {
+            return ResponseEntity.badRequest().body("Email is already in use");
+        }
+
+        User user = new User();
+        user.setUsername(request.getUsername());
+        user.setEmail(request.getEmail());
+        user.setPassword(passwordEncoder.encode(request.getPassword()));
+        user.setFirstName(request.getFirstName());
+        user.setLastName(request.getLastName());
+
+        Set<Role> roles = new HashSet<>();
+        Role adminRole = findRoleByName(Role.RoleType.ROLE_SUPER_ADMIN);
+        roles.add(adminRole);
+        user.setRoles(roles);
+
+        User result = userRepository.save(user);
+        
+        return ResponseEntity.ok(convertToUserResponse(result));
     }
 } 

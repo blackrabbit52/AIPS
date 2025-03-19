@@ -1,0 +1,47 @@
+version: '3.8'
+
+services:
+  auth-service:
+    # Build configuration for authentication service
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    # Port mapping for Spring Boot application
+    ports:
+      - "8080:8080"
+    # Environment configuration for Spring Boot
+    environment:
+      - SPRING_PROFILES_ACTIVE=dev
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://db:5432/aips_auth
+      - SPRING_DATASOURCE_USERNAME=postgres
+      - SPRING_DATASOURCE_PASSWORD=postgres
+    volumes:
+      - maven_cache:/root/.m2
+    # Service dependencies
+    depends_on:
+      db:
+        condition: service_healthy
+
+  # Database service configuration
+  db:
+    image: postgres:13
+    ports:
+      - "5432:5432"
+    # Database environment configuration
+    environment:
+      - POSTGRES_DB=aips_auth
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+    volumes:
+      - postgre_auth_data:/var/lib/postgresql/data
+    # Health check configuration
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d aips_auth"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+# Volume definitions
+volumes:
+  maven_cache: 
+  postgre_auth_data:

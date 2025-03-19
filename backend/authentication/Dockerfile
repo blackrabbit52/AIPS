@@ -1,52 +1,40 @@
 # Build stage
-FROM eclipse-temurin:11-jdk-alpine as build
+FROM maven:3.8.4-openjdk-17 AS builder
 
-# Maven cache configuration
-ENV MAVEN_OPTS="-Dmaven.repo.local=/root/.m2/repository"
-
-# Install required dependencies
-RUN apk add --no-cache curl
-
+# Set working directory
 WORKDIR /build
 
-# Copy only pom.xml for dependency caching
+# Copy only the POM file first
 COPY pom.xml .
-COPY .mvn .mvn
-COPY mvnw .
 
-# Download dependencies (will be cached)
-RUN --mount=type=cache,target=/root/.m2/repository \
-    ./mvnw dependency:go-offline
+# Download dependencies (this layer will be cached)
+RUN mvn dependency:go-offline
 
-# Copy the rest of the source code
-COPY src src
+# Copy source code
+COPY src ./src
 
-# Build with detailed logs
-RUN --mount=type=cache,target=/root/.m2/repository \
-    ./mvnw clean package -DskipTests -X
+# Build the application
+RUN mvn clean package -DskipTests
 
-# Verify contents
-RUN ls -la target/
+# Run stage
+FROM openjdk:17-slim
 
-# Runtime stage
-FROM eclipse-temurin:11-jre-alpine
-
+# Set working directory
 WORKDIR /app
 
-# Copy JAR with explicit name
-COPY --from=build /build/target/authentication-1.0.0.jar /app/app.jar
-
 # Install curl for healthcheck
-RUN apk add --no-cache curl
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends curl && \
+    rm -rf /var/lib/apt/lists/*
 
+# Copy jar from builder
+COPY --from=builder /build/target/authentication-1.0.0.jar app.jar
+
+# Expose port
 EXPOSE 8080
 
-# Health check with correct endpoint path
-HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
-    CMD curl -f http://localhost:8080/api/health || exit 1
+# Set Java options
+ENV JAVA_OPTS="-Xms512m -Xmx512m"
 
-# Add Java environment variables for logging
-ENV JAVA_OPTS="-Dlogging.level.root=INFO -Dlogging.level.com.aips=DEBUG"
-
-# Start with detailed logs
-ENTRYPOINT ["sh", "-c", "java $JAVA_OPTS -jar app.jar"] 
+# Start the application
+CMD ["sh", "-c", "java $JAVA_OPTS -jar app.jar"] 

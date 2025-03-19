@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   Box,
   Card,
@@ -8,7 +8,10 @@ import {
   Typography,
   Divider,
   IconButton,
-  Stack
+  Stack,
+  Alert,
+  Container,
+  Paper
 } from '@mui/material';
 import {
   Facebook as FacebookIcon,
@@ -18,7 +21,8 @@ import {
 } from '@mui/icons-material';
 import { useFormik } from 'formik';
 import * as yup from 'yup';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
+import authService from '../services/auth.service';
 
 const validationSchema = yup.object({
   email: yup
@@ -37,7 +41,7 @@ const socialButtons = [
     label: 'Google', 
     color: '#DB4437',
     onClick: () => {
-      // Implémenter la connexion Google
+      // Implement Google login
       console.log('Google login');
     }
   },
@@ -46,7 +50,7 @@ const socialButtons = [
     label: 'Facebook', 
     color: '#4267B2',
     onClick: () => {
-      // Implémenter la connexion Facebook
+      // Implement Facebook login
       console.log('Facebook login');
     }
   },
@@ -55,7 +59,7 @@ const socialButtons = [
     label: 'GitHub', 
     color: '#333',
     onClick: () => {
-      // Implémenter la connexion GitHub
+      // Implement GitHub login
       console.log('GitHub login');
     }
   },
@@ -64,110 +68,143 @@ const socialButtons = [
     label: 'Twitter', 
     color: '#1DA1F2',
     onClick: () => {
-      // Implémenter la connexion Twitter
+      // Implement Twitter login
       console.log('Twitter login');
     }
   }
 ];
 
-export default function Login() {
-  const formik = useFormik({
-    initialValues: {
-      email: '',
-      password: '',
-    },
-    validationSchema: validationSchema,
-    onSubmit: (values) => {
-      // Implémenter la connexion
-      console.log('Form submit:', values);
-    },
-  });
+const Login = () => {
+  const [identifier, setIdentifier] = useState('');
+  const [password, setPassword] = useState('');
+  const [error, setError] = useState('');
+  const navigate = useNavigate();
+
+  const handleLogin = async (e) => {
+    e.preventDefault();
+    try {
+      const response = await authService.login(identifier, password);
+      if (response.data.token) {
+        navigate('/');
+      }
+    } catch (error) {
+      setError(error.response?.data?.message || 'Login failed. Please try again.');
+    }
+  };
 
   return (
-    <Box
-      sx={{
-        display: 'flex',
-        justifyContent: 'center',
-        alignItems: 'center',
-        minHeight: 'calc(100vh - 64px)',
-        backgroundColor: 'background.default',
-        p: 3
-      }}
-    >
-      <Card sx={{ maxWidth: 400, width: '100%' }}>
-        <CardContent>
-          <Typography variant="h5" align="center" gutterBottom>
-            Login
+    <Container component="main" maxWidth="xs">
+      <Box
+        sx={{
+          marginTop: 8,
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+        }}
+      >
+        <Paper
+          elevation={3}
+          sx={{
+            padding: 4,
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            width: '100%',
+          }}
+        >
+          <Typography component="h1" variant="h5" sx={{ mb: 3 }}>
+            Sign In
           </Typography>
 
-          <form onSubmit={formik.handleSubmit}>
-            <TextField
-              fullWidth
-              id="email"
-              name="email"
-              label="Email"
-              variant="outlined"
-              margin="normal"
-              value={formik.values.email}
-              onChange={formik.handleChange}
-              error={formik.touched.email && Boolean(formik.errors.email)}
-              helperText={formik.touched.email && formik.errors.email}
-            />
+          {error && (
+            <Alert severity="error" sx={{ width: '100%', mb: 2 }}>
+              {error}
+            </Alert>
+          )}
 
+          <Box component="form" onSubmit={handleLogin} sx={{ mt: 1, width: '100%' }}>
             <TextField
+              margin="normal"
+              required
               fullWidth
-              id="password"
+              id="identifier"
+              label="Username or Email"
+              name="identifier"
+              autoComplete="email"
+              autoFocus
+              value={identifier}
+              onChange={(e) => setIdentifier(e.target.value)}
+            />
+            <TextField
+              margin="normal"
+              required
+              fullWidth
               name="password"
               label="Password"
               type="password"
-              variant="outlined"
-              margin="normal"
-              value={formik.values.password}
-              onChange={formik.handleChange}
-              error={formik.touched.password && Boolean(formik.errors.password)}
-              helperText={formik.touched.password && formik.errors.password}
+              id="password"
+              autoComplete="current-password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
             />
 
             <Button
+              type="submit"
               fullWidth
               variant="contained"
-              color="primary"
-              type="submit"
               sx={{ mt: 3, mb: 2 }}
             >
-              Login
+              Sign In
             </Button>
-          </form>
 
-          <Divider sx={{ my: 3 }}>or</Divider>
+            <Divider sx={{ my: 2 }}>OR</Divider>
 
-          <Stack direction="row" spacing={2} justifyContent="center" sx={{ mb: 3 }}>
-            {socialButtons.map((btn) => (
+            <Box sx={{ display: 'flex', justifyContent: 'center', gap: 2, mb: 2 }}>
               <IconButton
-                key={btn.label}
-                onClick={btn.onClick}
                 sx={{
+                  backgroundColor: '#DB4437',
                   color: 'white',
-                  backgroundColor: btn.color,
-                  '&:hover': {
-                    backgroundColor: btn.color,
-                    opacity: 0.9
-                  }
+                  '&:hover': { backgroundColor: '#C53929' }
                 }}
               >
-                {btn.icon}
+                <GoogleIcon />
               </IconButton>
-            ))}
-          </Stack>
+              <IconButton
+                sx={{
+                  backgroundColor: '#4267B2',
+                  color: 'white',
+                  '&:hover': { backgroundColor: '#365899' }
+                }}
+              >
+                <FacebookIcon />
+              </IconButton>
+              <IconButton
+                sx={{
+                  backgroundColor: '#333',
+                  color: 'white',
+                  '&:hover': { backgroundColor: '#24292e' }
+                }}
+              >
+                <GitHubIcon />
+              </IconButton>
+            </Box>
 
-          <Typography variant="body2" align="center">
-            Don't have an account?{' '}
-            <Link to="/register" style={{ color: 'primary' }}>
-              Sign up
-            </Link>
-          </Typography>
-        </CardContent>
-      </Card>
-    </Box>
+            <Box sx={{ mt: 2, textAlign: 'center' }}>
+              <Typography variant="body2" color="text.secondary">
+                Don't have an account?{' '}
+                <Button
+                  onClick={() => navigate('/register')}
+                  sx={{ textTransform: 'none' }}
+                >
+                  Sign Up
+                </Button>
+              </Typography>
+            </Box>
+          </Box>
+        </Paper>
+      </Box>
+    </Container>
   );
-} 
+};
+
+export default Login; 
