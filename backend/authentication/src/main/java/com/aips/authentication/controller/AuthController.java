@@ -9,7 +9,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
-@RequestMapping("/api/auth")
+@RequestMapping("/auth")
 public class AuthController {
     private final AuthenticationService authenticationService;
     private final UserService userService;
@@ -26,7 +26,7 @@ public class AuthController {
 
     @PostMapping("/signup")
     public ResponseEntity<?> registerUser(@Valid @RequestBody SignUpRequest signUpRequest) {
-        return userService.registerUser(signUpRequest);
+        return authenticationService.registerUser(signUpRequest);
     }
 
     @PostMapping("/signup/super-admin")

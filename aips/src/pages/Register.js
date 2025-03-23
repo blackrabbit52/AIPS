@@ -27,6 +27,10 @@ const StyledPaper = styled(Paper)(({ theme }) => ({
 }));
 
 const validationSchema = yup.object({
+  username: yup
+    .string()
+    .required('Username is required')
+    .max(50, 'Username must be at most 50 characters'),
   firstName: yup
     .string()
     .required('First name is required')
@@ -58,6 +62,7 @@ const Register = () => {
 
   const formik = useFormik({
     initialValues: {
+      username: '',
       firstName: '',
       lastName: '',
       email: '',
@@ -70,16 +75,14 @@ const Register = () => {
       setError('');
 
       try {
-        // Call the registration service with explicit URL
         await authService.register({
+          username: values.username,
           firstName: values.firstName,
           lastName: values.lastName,
           email: values.email,
-          password: values.password,
-          _forceUrl: true  // Flag to force using direct URL without /v1
+          password: values.password
         });
 
-        // Redirect to login page after successful registration
         navigate('/login', { 
           state: { 
             message: 'Registration successful! Please login with your credentials.' 
@@ -108,6 +111,21 @@ const Register = () => {
 
         <Box component="form" onSubmit={formik.handleSubmit} sx={{ width: '100%', mt: 1 }}>
           <Grid container spacing={2}>
+            <Grid item xs={12}>
+              <TextField
+                required
+                fullWidth
+                id="username"
+                label="Username"
+                name="username"
+                autoComplete="username"
+                value={formik.values.username}
+                onChange={formik.handleChange}
+                error={formik.touched.username && Boolean(formik.errors.username)}
+                helperText={formik.touched.username && formik.errors.username}
+                disabled={isLoading}
+              />
+            </Grid>
             <Grid item xs={12} sm={6}>
               <TextField
                 required

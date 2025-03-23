@@ -4,6 +4,7 @@ import com.aips.authentication.dto.SignUpRequest;
 import com.aips.authentication.dto.UserResponse;
 import com.aips.authentication.exception.ResourceNotFoundException;
 import com.aips.authentication.model.Role;
+import com.aips.authentication.model.Role.RoleType;
 import com.aips.authentication.model.User;
 import com.aips.authentication.repository.RoleRepository;
 import com.aips.authentication.repository.UserRepository;
@@ -18,9 +19,10 @@ import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -33,8 +35,8 @@ public class UserService implements UserDetailsService {
     private final RoleRepository roleRepository;
     private final PasswordEncoder passwordEncoder;
 
-    public UserService(UserRepository userRepository,
-                      RoleRepository roleRepository,
+    public UserService(UserRepository userRepository, 
+                      RoleRepository roleRepository, 
                       PasswordEncoder passwordEncoder) {
         this.userRepository = userRepository;
         this.roleRepository = roleRepository;
@@ -141,7 +143,7 @@ public class UserService implements UserDetailsService {
         
         if (userRequest.getRoles() != null) {
             Set<Role> roles = userRequest.getRoles().stream()
-                    .map(roleName -> findRoleByName(Role.RoleType.valueOf(roleName)))
+                    .map(roleName -> findRole(roleName))
                     .collect(Collectors.toSet());
             user.setRoles(roles);
         }
@@ -174,7 +176,13 @@ public class UserService implements UserDetailsService {
         return userRepository.existsByRoles_Name(Role.RoleType.ROLE_SUPER_ADMIN);
     }
 
-    private Role findRoleByName(Role.RoleType roleType) {
+    private Role findRole(String roleName) {
+        Role.RoleType roleType;
+        try {
+            roleType = Role.RoleType.valueOf(roleName);
+        } catch (IllegalArgumentException e) {
+            throw new RuntimeException("Invalid role name: " + roleName);
+        }
         return roleRepository.findByName(roleType)
                 .orElseThrow(() -> new RuntimeException("Role not found"));
     }
@@ -215,27 +223,39 @@ public class UserService implements UserDetailsService {
 
     @Transactional
     public ResponseEntity<?> registerSuperAdmin(SignUpRequest request) {
-        if (userRepository.existsByUsername(request.getUsername())) {
-            return ResponseEntity.badRequest().body("Username is already taken");
+        try {
+            if (userRepository.existsByUsername(request.getUsername())) {
+                return ResponseEntity.badRequest().body("Username is already taken");
+            }
+            if (userRepository.existsByEmail(request.getEmail())) {
+                return ResponseEntity.badRequest().body("Email is already in use");
+            }
+
+            User user = new User();
+            user.setUsername(request.getUsername());
+            user.setEmail(request.getEmail());
+            user.setPassword(passwordEncoder.encode(request.getPassword()));
+            user.setFirstName(request.getFirstName());
+            user.setLastName(request.getLastName());
+
+            // Add all available roles to super admin temporarily
+            Set<Role> roles = new HashSet<>();
+            roles.add(roleRepository.findByName(RoleType.ROLE_SUPER_ADMIN)
+                .orElseThrow(() -> new RuntimeException("Role SUPER_ADMIN not found")));
+            roles.add(roleRepository.findByName(RoleType.ROLE_ADMIN)
+                .orElseThrow(() -> new RuntimeException("Role ADMIN not found")));
+            roles.add(roleRepository.findByName(RoleType.ROLE_USER)
+                .orElseThrow(() -> new RuntimeException("Role USER not found")));
+            roles.add(roleRepository.findByName(RoleType.ROLE_ANALYST)
+                .orElseThrow(() -> new RuntimeException("Role ANALYST not found")));
+
+            user.setRoles(roles);
+            User savedUser = userRepository.save(user);
+            
+            return ResponseEntity.ok(convertToUserResponse(savedUser));
+        } catch (Exception e) {
+            logger.error("Error while registering super admin", e);
+            return ResponseEntity.internalServerError().body("Error: " + e.getMessage());
         }
-        if (userRepository.existsByEmail(request.getEmail())) {
-            return ResponseEntity.badRequest().body("Email is already in use");
-        }
-
-        User user = new User();
-        user.setUsername(request.getUsername());
-        user.setEmail(request.getEmail());
-        user.setPassword(passwordEncoder.encode(request.getPassword()));
-        user.setFirstName(request.getFirstName());
-        user.setLastName(request.getLastName());
-
-        Set<Role> roles = new HashSet<>();
-        Role adminRole = findRoleByName(Role.RoleType.ROLE_SUPER_ADMIN);
-        roles.add(adminRole);
-        user.setRoles(roles);
-
-        User result = userRepository.save(user);
-        
-        return ResponseEntity.ok(convertToUserResponse(result));
     }
 } 

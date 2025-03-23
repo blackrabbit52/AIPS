@@ -1,128 +1,160 @@
-import React from 'react';
+import { useState } from 'react';
 import {
-  Box,
   Container,
   Typography,
   Grid,
   Card,
   CardContent,
-  CardActionArea,
-  useTheme
+  CardMedia,
+  Button,
+  Box,
+  Paper,
+  useTheme,
+  Fade
 } from '@mui/material';
-import {
-  Analytics as AnalyticsIcon,
-  Psychology as PsychologyIcon,
-  TrendingUp as TrendingUpIcon,
-  Security as SecurityIcon
-} from '@mui/icons-material';
+import { Analytics, Security, Speed } from '@mui/icons-material';
+import { useNavigate } from 'react-router-dom';
 
-const features = [
-  {
-    title: 'Advanced Analysis',
-    description: 'Analyze social media profiles and posts with our AI-powered tools',
-    icon: <AnalyticsIcon fontSize="large" />,
-  },
-  {
-    title: 'Personality Insights',
-    description: 'Get deep insights into personality traits and behavioral patterns',
-    icon: <PsychologyIcon fontSize="large" />,
-  },
-  {
-    title: 'Trend Detection',
-    description: 'Identify emerging patterns and trends in social behavior',
-    icon: <TrendingUpIcon fontSize="large" />,
-  },
-  {
-    title: 'Secure & Private',
-    description: 'Your data is protected with enterprise-grade security',
-    icon: <SecurityIcon fontSize="large" />,
-  },
-];
-
-export default function Home() {
+const Home = () => {
   const theme = useTheme();
+  const navigate = useNavigate();
+  const [hoveredFeature, setHoveredFeature] = useState(null);
+
+  const features = [
+    {
+      icon: <Analytics fontSize="large" />,
+      title: 'Advanced Analytics',
+      description: 'Powerful tools for data analysis and visualization'
+    },
+    {
+      icon: <Security fontSize="large" />,
+      title: 'Secure Platform',
+      description: 'Enterprise-grade security for your sensitive data'
+    },
+    {
+      icon: <Speed fontSize="large" />,
+      title: 'Real-time Processing',
+      description: 'Instant results with our high-performance engine'
+    }
+  ];
 
   return (
-    <Container maxWidth="lg">
-      <Box sx={{ mt: 8, mb: 12 }}>
-        <Typography
-          variant="h2"
-          align="center"
-          gutterBottom
-          sx={{ fontWeight: 'bold' }}
-        >
-          Welcome to AIPS
-        </Typography>
-        <Typography
-          variant="h5"
-          align="center"
-          color="text.secondary"
-          paragraph
-          sx={{ mb: 8 }}
-        >
-          Advanced Intelligent Personality System - Unlock the power of social media analysis
-        </Typography>
+    <Box>
+      {/* Hero Section */}
+      <Paper 
+        sx={{ 
+          bgcolor: theme.palette.primary.main,
+          color: 'white',
+          py: 8,
+          mb: 6
+        }}
+      >
+        <Container maxWidth="lg">
+          <Grid container spacing={4} alignItems="center">
+            <Grid item xs={12} md={6}>
+              <Fade in={true} timeout={1000}>
+                <Box>
+                  <Typography variant="h2" gutterBottom>
+                    Welcome to AIPS
+                  </Typography>
+                  <Typography variant="h5" paragraph>
+                    Advanced Intelligent Processing System
+                  </Typography>
+                  <Typography variant="body1" paragraph>
+                    Transform your data into actionable insights with our cutting-edge analysis platform.
+                  </Typography>
+                  <Button 
+                    variant="contained" 
+                    color="secondary" 
+                    size="large"
+                    onClick={() => navigate('/analysis')}
+                    sx={{ mt: 2 }}
+                  >
+                    Start Analyzing
+                  </Button>
+                </Box>
+              </Fade>
+            </Grid>
+            <Grid item xs={12} md={6}>
+              {/* Add an illustration or image here */}
+            </Grid>
+          </Grid>
+        </Container>
+      </Paper>
 
-        <Grid container spacing={4}>
+      {/* Features Section */}
+      <Container maxWidth="lg" sx={{ mb: 6 }}>
+        <Typography variant="h4" align="center" gutterBottom>
+          Our Features
+        </Typography>
+        <Grid container spacing={4} sx={{ mt: 2 }}>
           {features.map((feature, index) => (
-            <Grid item xs={12} sm={6} md={3} key={index}>
-              <Card
-                sx={{
-                  height: '100%',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  transition: 'transform 0.2s',
-                  '&:hover': {
-                    transform: 'translateY(-8px)',
-                    boxShadow: theme.shadows[8],
-                  },
-                }}
-              >
-                <CardActionArea sx={{ height: '100%', p: 2 }}>
+            <Grid item xs={12} md={4} key={index}>
+              <Fade in={true} timeout={1000 + index * 500}>
+                <Card 
+                  onMouseEnter={() => setHoveredFeature(index)}
+                  onMouseLeave={() => setHoveredFeature(null)}
+                  sx={{ 
+                    height: '100%',
+                    transform: hoveredFeature === index ? 'scale(1.05)' : 'scale(1)',
+                    transition: 'transform 0.3s ease-in-out',
+                    '&:hover': {
+                      boxShadow: theme.shadows[10]
+                    }
+                  }}
+                >
                   <CardContent>
-                    <Box
-                      sx={{
-                        display: 'flex',
-                        justifyContent: 'center',
-                        mb: 2,
-                        color: 'primary.main',
-                      }}
-                    >
+                    <Box sx={{ 
+                      display: 'flex', 
+                      justifyContent: 'center', 
+                      mb: 2,
+                      color: theme.palette.primary.main
+                    }}>
                       {feature.icon}
                     </Box>
-                    <Typography
-                      gutterBottom
-                      variant="h5"
-                      component="h2"
-                      align="center"
-                    >
+                    <Typography variant="h6" align="center" gutterBottom>
                       {feature.title}
                     </Typography>
-                    <Typography
-                      variant="body2"
-                      color="text.secondary"
-                      align="center"
-                    >
+                    <Typography variant="body2" align="center" color="text.secondary">
                       {feature.description}
                     </Typography>
                   </CardContent>
-                </CardActionArea>
-              </Card>
+                </Card>
+              </Fade>
             </Grid>
           ))}
         </Grid>
+      </Container>
 
-        <Box sx={{ mt: 8, textAlign: 'center' }}>
-          <Typography variant="h4" gutterBottom>
-            How It Works
+      {/* Call to Action Section */}
+      <Paper sx={{ bgcolor: theme.palette.grey[100], py: 6 }}>
+        <Container maxWidth="md">
+          <Typography variant="h4" align="center" gutterBottom>
+            Ready to Get Started?
           </Typography>
-          <Typography variant="body1" color="text.secondary" paragraph>
-            Our platform uses advanced machine learning algorithms to analyze social media
-            profiles and content, providing valuable insights into personality traits,
-            behavior patterns, and social trends.
+          <Typography variant="body1" align="center" paragraph>
+            Join thousands of users who are already transforming their data analysis process.
           </Typography>
-        </Box>
-      </Box>
-    </Container>
+          <Box sx={{ display: 'flex', justifyContent: 'center', gap: 2, mt: 3 }}>
+            <Button 
+              variant="contained" 
+              color="primary"
+              onClick={() => navigate('/register')}
+            >
+              Sign Up Now
+            </Button>
+            <Button 
+              variant="outlined" 
+              color="primary"
+              onClick={() => navigate('/about')}
+            >
+              Learn More
+            </Button>
+          </Box>
+        </Container>
+      </Paper>
+    </Box>
   );
-} 
+};
+
+export default Home; 

@@ -1,35 +1,29 @@
-import React from 'react';
-import { Navigate, useLocation } from 'react-router-dom';
+import { Navigate, useLocation, Outlet } from 'react-router-dom';
 import authService from '../services/auth.service';
 
-const PrivateRoute = ({ children, requiredRoles = [], requiredPermissions = [] }) => {
-    const location = useLocation();
-    const isAuthenticated = authService.isAuthenticated();
+const PrivateRoute = ({ requiredRole }) => {
+  const location = useLocation();
+  const currentUser = authService.getCurrentUser();
 
-    // Check authentication
-    if (!isAuthenticated) {
-        return <Navigate to="/login" state={{ from: location }} replace />;
-    }
+  // Debug authentication state
+  console.log('Route protection check:', {
+    currentUser,
+    token: localStorage.getItem('token'),
+    currentPath: location.pathname
+  });
 
-    // Check roles if specified
-    if (requiredRoles.length > 0) {
-        const hasRequiredRole = requiredRoles.some(role => authService.hasRole(role));
-        if (!hasRequiredRole) {
-            return <Navigate to="/unauthorized" replace />;
-        }
-    }
+  // Vérification plus stricte de l'authentification
+  if (!currentUser || !localStorage.getItem('token')) {
+    localStorage.setItem('intendedUrl', location.pathname);
+    return <Navigate to="/login" state={{ from: location }} replace />;
+  }
 
-    // Check permissions if specified
-    if (requiredPermissions.length > 0) {
-        const hasRequiredPermission = requiredPermissions.some(
-            permission => authService.hasPermission(permission)
-        );
-        if (!hasRequiredPermission) {
-            return <Navigate to="/unauthorized" replace />;
-        }
-    }
+  // Vérification du rôle si nécessaire
+  if (requiredRole && !authService.hasRole(requiredRole)) {
+    return <Navigate to="/" replace />;
+  }
 
-    return children;
+  return <Outlet />;
 };
 
 export default PrivateRoute; 

@@ -1,39 +1,74 @@
 import React from 'react';
-import { Box, useTheme } from '@mui/material';
-import { useLocation } from 'react-router-dom';
-import { Navbar } from './Navbar';
+import { Box, Breadcrumbs, Link, Typography } from '@mui/material';
+import { Link as RouterLink, useLocation, Outlet } from 'react-router-dom';
 import { Footer } from './Footer';
 
-export const Layout = ({ children, toggleTheme, isDarkMode }) => {
+export const Layout = () => {
   const location = useLocation();
-  const theme = useTheme();
-  const isAuthPage = ['/login', '/register'].includes(location.pathname);
+  
+  // Generate breadcrumb navigation from current path
+  const generateBreadcrumbs = () => {
+    const pathnames = location.pathname.split('/').filter((x) => x);
+    return [
+      { text: 'Home', link: '/' },
+      ...pathnames.map((name, index) => ({
+        text: name.charAt(0).toUpperCase() + name.slice(1),
+        link: index === pathnames.length - 1 ? null : `/${pathnames.slice(0, index + 1).join('/')}`
+      }))
+    ];
+  };
 
   return (
-    <Box
-      sx={{
-        display: 'flex',
+    <Box 
+      sx={{ 
+        minHeight: '100vh', 
+        display: 'flex', 
         flexDirection: 'column',
-        minHeight: '100vh',
-        bgcolor: theme.palette.background.default,
+        pt: '64px', // Account for fixed AppBar height
       }}
     >
-      {!isAuthPage && <Navbar toggleTheme={toggleTheme} isDarkMode={isDarkMode} />}
-      <Box
-        component="main"
-        sx={{
-          flexGrow: 1,
-          mt: isAuthPage ? 0 : 8,
-          display: 'flex',
-          flexDirection: 'column',
+      {/* Display breadcrumbs except on home page */}
+      {location.pathname !== '/' && (
+        <Box sx={{ p: 2 }}>
+          <Breadcrumbs aria-label="breadcrumb">
+            {generateBreadcrumbs().map((crumb, index) => 
+              crumb.link ? (
+                <Link 
+                  key={index}
+                  component={RouterLink} 
+                  to={crumb.link}
+                  color="inherit"
+                  sx={{ textDecoration: 'none' }}
+                >
+                  {crumb.text}
+                </Link>
+              ) : (
+                <Typography key={index} color="text.primary">
+                  {crumb.text}
+                </Typography>
+              )
+            )}
+          </Breadcrumbs>
+        </Box>
+      )}
+      
+      {/* Main content area */}
+      <Box 
+        component="main" 
+        sx={{ 
+          flex: 1,
+          p: 3,
           width: '100%',
-          px: { xs: 2, sm: 3 },
-          py: { xs: 2, sm: 3 },
+          maxWidth: '100%',
+          overflow: 'auto'
         }}
       >
-        {children}
+        <Outlet />
       </Box>
-      {!isAuthPage && <Footer />}
+      
+      <Footer />
     </Box>
   );
-}; 
+};
+
+export default Layout; 

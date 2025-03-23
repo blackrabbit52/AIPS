@@ -1,80 +1,103 @@
 import axios from 'axios';
 
-// Définir l'URL de base correcte
-const API_URL = "http://localhost:8080/api/v1/auth/";
+// Base API URL configuration
+const API_URL = "http://localhost:8080/api/v1";
 
-// Désactiver toute configuration globale d'axios
-delete axios.defaults.baseURL;
-delete axios.defaults.headers.common['Accept'];
-axios.defaults.headers.post['Content-Type'] = 'application/json';
-axios.interceptors.request.handlers = [];
-axios.interceptors.response.handlers = [];
+// Global Axios configuration for CORS and headers
+axios.defaults.headers.common['Content-Type'] = 'application/json';
+axios.defaults.headers.common['Accept'] = 'application/json';
+axios.defaults.withCredentials = true; // Required for CORS
 
 class AuthService {
-    async login(email, password) {
-        const response = await axios.post(`${API_URL}/signin`, {
-            usernameOrEmail: email,
-            password: password
-        });
-        if (response.data) {
-            localStorage.setItem('token', response.data);
-            this.setupAxiosInterceptors();
+    async login(usernameOrEmail, password) {
+        console.log('Login attempt:', { usernameOrEmail, password });
+        try {
+            const response = await axios.post(`${API_URL}/auth/signin`, {
+                usernameOrEmail,
+                password
+            }, {
+                withCredentials: true,
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json'
+                }
+            });
+            console.log('Server response:', response.data);
+            if (response.data.token) {
+                // Store token separately
+                localStorage.setItem('token', response.data.token);
+                // Store user data
+                localStorage.setItem('user', JSON.stringify(response.data));
+                // Set axios default header
+                axios.defaults.headers.common['Authorization'] = `Bearer ${response.data.token}`;
+                // Trigger authentication state change
+                window.dispatchEvent(new Event('auth-change'));
+            }
+            return response.data;
+        } catch (error) {
+            console.error('Authentication error:', error);
+            throw this.handleError(error);
         }
-        return response.data;
     }
 
     logout() {
         localStorage.removeItem('token');
-        window.location.href = '/login';
+        localStorage.removeItem('user');
+        delete axios.defaults.headers.common['Authorization'];
+        window.dispatchEvent(new Event('auth-change'));
     }
 
-    async register(username, email, password) {
+    async register(formData) {
+        console.log('Registration attempt:', formData);
         try {
-            const response = await axios.post(API_URL + "register", {
-                username,
-                email,
-                password
+            const response = await axios.post(`${API_URL}/auth/signup`, {
+                username: formData.username,
+                email: formData.email,
+                password: formData.password,
+                firstName: formData.firstName,
+                lastName: formData.lastName
             }, {
                 headers: {
                     'Content-Type': 'application/json',
                     'Accept': 'application/json'
                 }
             });
-            return response;
+            console.log('Server response:', response.data);
+            return response.data;
         } catch (error) {
-            if (error.response) {
-                throw error.response.data;
-            } else if (error.request) {
-                throw new Error('Server is not responding. Please check your connection.');
-            } else {
-                throw new Error('Error creating account.');
-            }
+            console.error('Detailed error:', error);
+            throw this.handleError(error);
         }
     }
 
     getCurrentUser() {
-        const token = localStorage.getItem('token');
-        if (token) {
-            try {
-                return JSON.parse(atob(token.split('.')[1]));
-            } catch (error) {
-                return null;
-            }
+        try {
+            const userStr = localStorage.getItem('user');
+            const user = userStr ? JSON.parse(userStr) : null;
+            
+            // Ajouter des logs pour le débogage
+            console.log('Current user:', user);
+            
+            return user;
+        } catch (error) {
+            console.error('Error getting current user:', error);
+            return null;
         }
-        return null;
     }
 
     isAuthenticated() {
-        const token = localStorage.getItem('token');
-        if (token) {
-            try {
-                const decoded = JSON.parse(atob(token.split('.')[1]));
-                return decoded.exp * 1000 > Date.now();
-            } catch {
-                return false;
-            }
-        }
-        return false;
+        const user = this.getCurrentUser();
+        const token = user?.token || localStorage.getItem('token');
+        const isValid = !!token;
+        
+        // Debug logs
+        console.log('Auth check:', {
+            hasToken: !!token,
+            hasUser: !!user,
+            isValid
+        });
+        
+        return isValid;
     }
 
     hasRole(role) {
@@ -89,28 +112,9 @@ class AuthService {
 
     setupAxiosInterceptors() {
         const token = localStorage.getItem('token');
-        
-        axios.interceptors.request.use(
-            (config) => {
-                if (token) {
-                    config.headers.Authorization = `Bearer ${token}`;
-                }
-                return config;
-            },
-            (error) => {
-                return Promise.reject(error);
-            }
-        );
-
-        axios.interceptors.response.use(
-            (response) => response,
-            (error) => {
-                if (error.response?.status === 401) {
-                    this.logout();
-                }
-                return Promise.reject(error);
-            }
-        );
+        if (token) {
+            axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
+        }
     }
 
     // Nouvelles méthodes pour le backoffice
@@ -151,33 +155,63 @@ class AuthService {
     }
 
     handleError(error) {
+        console.error('Error processing:', error);
         if (error.response) {
-            // Le serveur a répondu avec un code d'erreur
-            return {
-                message: error.response.data.message || "Une erreur est survenue",
-                status: error.response.status
-            };
+            // Server returned error response
+            return error.response.data || 'An error occurred';
         } else if (error.request) {
-            // La requête a été faite mais pas de réponse
-            return {
-                message: "Le serveur ne répond pas",
-                status: 503
-            };
+            // Request made but no response received
+            console.error('No response from server:', error.request);
+            return 'Server is not responding. Please check your connection.';
         } else {
-            // Une erreur s'est produite lors de la configuration de la requête
-            return {
-                message: error.message,
-                status: 500
-            };
+            // Request configuration error
+            console.error('Request configuration error:', error.message);
+            return error.message;
         }
     }
 
-    createSuperAdmin(username, email, password) {
-        return axios.post(API_URL + "/create-super-admin", {
-            username,
-            email,
-            password
+    async createSuperAdmin(username, email, password) {
+        const data = {
+            username: username,
+            email: email,
+            password: password,
+            firstName: "",  // Valeur par défaut
+            lastName: ""    // Valeur par défaut
+        };
+        
+        return axios.post(`${API_URL}/users/superuser`, data, {
+            headers: {
+                'Content-Type': 'application/json',
+                'Accept': 'application/json'
+            }
         });
+    }
+
+    async changePassword(currentPassword, newPassword) {
+        try {
+            const response = await axios.post(`${API_URL}/change-password`, {
+                currentPassword,
+                newPassword
+            });
+            return response.data;
+        } catch (error) {
+            throw this.handleError(error);
+        }
+    }
+
+    async updateUserRole(userId, role) {
+        try {
+            const response = await axios.post(`${API_URL}/users/${userId}/roles`, {
+                role: role
+            }, {
+                headers: {
+                    'Authorization': `Bearer ${localStorage.getItem('token')}`
+                }
+            });
+            return response.data;
+        } catch (error) {
+            throw this.handleError(error);
+        }
     }
 }
 

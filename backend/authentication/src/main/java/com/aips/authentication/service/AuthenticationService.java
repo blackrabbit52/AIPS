@@ -1,19 +1,21 @@
 package com.aips.authentication.service;
 
-import com.aips.authentication.model.User;
-import com.aips.authentication.model.Role;
-import com.aips.authentication.repository.UserRepository;
-import com.aips.authentication.repository.RoleRepository;
-import com.aips.authentication.security.JwtTokenProvider;
-import com.aips.authentication.dto.LoginRequest;
+import com.aips.authentication.dto.AuthenticationRequest;
+import com.aips.authentication.dto.AuthenticationResponse;
 import com.aips.authentication.dto.SignUpRequest;
-import com.aips.authentication.exception.UserAlreadyExistsException;
+import com.aips.authentication.model.Role;
+import com.aips.authentication.model.Role.RoleType;
+import com.aips.authentication.model.User;
+import com.aips.authentication.repository.RoleRepository;
+import com.aips.authentication.repository.UserRepository;
+import com.aips.authentication.security.JwtService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
+import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -27,6 +29,9 @@ import java.util.stream.Collectors;
 import com.aips.authentication.dto.SignInRequest;
 import com.aips.authentication.dto.JwtAuthenticationResponse;
 import com.aips.authentication.security.UserPrincipal;
+import com.aips.authentication.dto.UserResponse;
+import java.util.Collections;
+import org.springframework.security.core.AuthenticationException;
 
 @Service
 public class AuthenticationService {
@@ -37,13 +42,13 @@ public class AuthenticationService {
     private final UserRepository userRepository;
     private final RoleRepository roleRepository;
     private final PasswordEncoder passwordEncoder;
-    private final JwtTokenProvider tokenProvider;
+    private final JwtService tokenProvider;
 
     public AuthenticationService(AuthenticationManager authenticationManager,
                                UserRepository userRepository,
                                RoleRepository roleRepository,
                                PasswordEncoder passwordEncoder,
-                               JwtTokenProvider tokenProvider) {
+                               JwtService tokenProvider) {
         this.authenticationManager = authenticationManager;
         this.userRepository = userRepository;
         this.roleRepository = roleRepository;
@@ -58,26 +63,35 @@ public class AuthenticationService {
      * @return ResponseEntity containing JWT token
      */
     public JwtAuthenticationResponse authenticateUser(SignInRequest request) {
-        Authentication authentication = authenticationManager.authenticate(
-            new UsernamePasswordAuthenticationToken(
-                request.getUsernameOrEmail(),
-                request.getPassword()
-            )
-        );
+        try {
+            Authentication authentication = authenticationManager.authenticate(
+                new UsernamePasswordAuthenticationToken(
+                    request.getUsernameOrEmail(),
+                    request.getPassword()
+                )
+            );
 
-        SecurityContextHolder.getContext().setAuthentication(authentication);
-        String jwt = tokenProvider.generateToken(authentication);
-        UserPrincipal userPrincipal = (UserPrincipal) authentication.getPrincipal();
+            SecurityContextHolder.getContext().setAuthentication(authentication);
+            
+            // Récupérer le UserPrincipal depuis l'authentification
+            UserPrincipal userPrincipal = (UserPrincipal) authentication.getPrincipal();
+            
+            // Générer le token avec le UserPrincipal (qui implémente UserDetails)
+            String jwt = tokenProvider.generateToken(userPrincipal);
 
-        return new JwtAuthenticationResponse(
-            jwt,
-            userPrincipal.getId(),
-            userPrincipal.getUsername(),
-            userPrincipal.getEmail(),
-            userPrincipal.getAuthorities().stream()
-                .map(GrantedAuthority::getAuthority)
-                .collect(Collectors.toSet())
-        );
+            return new JwtAuthenticationResponse(
+                jwt,
+                userPrincipal.getId(),
+                userPrincipal.getUsername(),
+                userPrincipal.getEmail(),
+                userPrincipal.getAuthorities().stream()
+                    .map(GrantedAuthority::getAuthority)
+                    .collect(Collectors.toSet())
+            );
+        } catch (AuthenticationException e) {
+            logger.error("Erreur d'authentification: {}", e.getMessage());
+            throw e;
+        }
     }
 
     /**
@@ -88,35 +102,61 @@ public class AuthenticationService {
      * @throws UserAlreadyExistsException if username or email already exists
      */
     @Transactional
-    public ResponseEntity<?> registerUser(SignUpRequest signupRequest) {
-        // Check if username is available
-        if (userRepository.existsByUsername(signupRequest.getUsername())) {
-            throw new UserAlreadyExistsException("Username is already taken");
+    public ResponseEntity<?> registerUser(SignUpRequest request) {
+        // Vérifier si l'username existe déjà
+        if (userRepository.existsByUsername(request.getUsername())) {
+            return ResponseEntity.badRequest().body("Username is already taken");
         }
 
-        // Check if email is available
-        if (userRepository.existsByEmail(signupRequest.getEmail())) {
-            throw new UserAlreadyExistsException("Email is already registered");
+        // Vérifier si l'email existe déjà
+        if (userRepository.existsByEmail(request.getEmail())) {
+            return ResponseEntity.badRequest().body("Email is already in use");
         }
 
-        // Create new user
+        // Créer un nouvel utilisateur
         User user = new User();
-        user.setUsername(signupRequest.getUsername());
-        user.setEmail(signupRequest.getEmail());
-        user.setPassword(passwordEncoder.encode(signupRequest.getPassword()));
-        user.setFirstName(signupRequest.getFirstName());
-        user.setLastName(signupRequest.getLastName());
-        user.setEnabled(true);
+        user.setUsername(request.getUsername());
+        user.setEmail(request.getEmail());
+        user.setPassword(passwordEncoder.encode(request.getPassword()));
+        user.setFirstName(request.getFirstName());
+        user.setLastName(request.getLastName());
 
-        // Set default role
+        // Assigner le rôle USER
         Role userRole = roleRepository.findByName(Role.RoleType.ROLE_USER)
-            .orElseGet(() -> roleRepository.save(Role.createDefaultUserRole()));
+            .orElseThrow(() -> new RuntimeException("Default role not found"));
         
-        user.setRoles(Set.of(userRole));
+        Set<Role> roles = new HashSet<>();
+        roles.add(userRole);
+        user.setRoles(roles);
 
-        // Save user
-        User savedUser = userRepository.save(user);
-        return ResponseEntity.ok(savedUser);
+        // Sauvegarder l'utilisateur
+        User result = userRepository.save(user);
+        
+        return ResponseEntity.ok(convertToUserResponse(result));
+    }
+
+    private UserResponse convertToUserResponse(User user) {
+        return new UserResponse(
+            user.getId(),
+            user.getUsername(),
+            user.getEmail(),
+            user.getFirstName(),
+            user.getLastName(),
+            user.getRoles().stream()
+                .map(role -> role.getName().name())
+                .collect(Collectors.toSet())
+        );
+    }
+
+    private Role getRole(Role.RoleType roleType) {
+        return roleRepository.findByName(roleType)
+                .orElseThrow(() -> new RuntimeException("Role not found"));
+    }
+
+    private Set<String> getRoleNames(Set<Role> roles) {
+        return roles.stream()
+                .map(role -> role.getName().name())
+                .collect(Collectors.toSet());
     }
 }
 

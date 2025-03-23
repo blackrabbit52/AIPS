@@ -2,16 +2,27 @@ package com.aips.authentication.model;
 
 import jakarta.persistence.*;
 import java.util.*;
+import lombok.Getter;
+import lombok.Setter;
 
 @Entity
 @Table(name = "roles")
+@Getter
+@Setter
 public class Role {
+    public enum RoleType {
+        ROLE_USER,
+        ROLE_ADMIN,
+        ROLE_SUPER_ADMIN,
+        ROLE_ANALYST
+    }
+
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
     
     @Enumerated(EnumType.STRING)
-    @Column(length = 20)
+    @Column(length = 60)
     private RoleType name;
     
     private String description;
@@ -19,17 +30,10 @@ public class Role {
     @ManyToMany(mappedBy = "roles")
     private Set<User> users = new HashSet<>();
     
-    public enum RoleType {
-        ROLE_USER,
-        ROLE_ADMIN,
-        ROLE_SUPER_ADMIN,
-        ROLE_ANALYST;
-
-        public static RoleType fromString(String role) {
-            return valueOf(role.toUpperCase());
-        }
-    }
-
+    /**
+     * Creates a default user role
+     * @return Role object with ROLE_USER type
+     */
     public static Role createDefaultUserRole() {
         Role role = new Role();
         role.setName(RoleType.ROLE_USER);
@@ -48,18 +52,34 @@ public class Role {
         return users;
     }
 
-    public Role() {}
+    public Role() {
+    }
 
     public Role(RoleType name) {
         this.name = name;
     }
 
-    public Long getId() { return id; }
-    public void setId(Long id) { this.id = id; }
-    
-    public RoleType getName() { return name; }
-    public void setName(RoleType name) { this.name = name; }
-    
-    public void setDescription(String description) { this.description = description; }
-    public String getDescription() { return description; }
+    public Long getId() {
+        return id;
+    }
+
+    public void setId(Long id) {
+        this.id = id;
+    }
+
+    public RoleType getName() {
+        return name;
+    }
+
+    public void setName(RoleType name) {
+        this.name = name;
+    }
+
+    public void setDescription(String description) {
+        this.description = description;
+    }
+
+    public String getDescription() {
+        return description;
+    }
 } 

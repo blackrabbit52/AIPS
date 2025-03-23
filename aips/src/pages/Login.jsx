@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Box,
   Card,
@@ -11,7 +11,8 @@ import {
   Stack,
   Alert,
   Container,
-  Paper
+  Paper,
+  CircularProgress
 } from '@mui/material';
 import {
   Facebook as FacebookIcon,
@@ -23,74 +24,64 @@ import { useFormik } from 'formik';
 import * as yup from 'yup';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import authService from '../services/auth.service';
+import { useNotification } from '../contexts/NotificationContext';
 
 const validationSchema = yup.object({
-  email: yup
+  usernameOrEmail: yup
     .string()
-    .email('Please enter a valid email address')
-    .required('Email is required'),
+    .required('Username or Email is required'),
   password: yup
     .string()
-    .min(8, 'Password must be at least 8 characters')
-    .required('Password is required'),
+    .required('Password is required')
 });
 
-const socialButtons = [
-  { 
-    icon: <GoogleIcon />, 
-    label: 'Google', 
-    color: '#DB4437',
-    onClick: () => {
-      // Implement Google login
-      console.log('Google login');
-    }
-  },
-  { 
-    icon: <FacebookIcon />, 
-    label: 'Facebook', 
-    color: '#4267B2',
-    onClick: () => {
-      // Implement Facebook login
-      console.log('Facebook login');
-    }
-  },
-  { 
-    icon: <GitHubIcon />, 
-    label: 'GitHub', 
-    color: '#333',
-    onClick: () => {
-      // Implement GitHub login
-      console.log('GitHub login');
-    }
-  },
-  { 
-    icon: <TwitterIcon />, 
-    label: 'Twitter', 
-    color: '#1DA1F2',
-    onClick: () => {
-      // Implement Twitter login
-      console.log('Twitter login');
-    }
-  }
-];
-
 const Login = () => {
-  const [identifier, setIdentifier] = useState('');
-  const [password, setPassword] = useState('');
   const [error, setError] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
   const navigate = useNavigate();
+  const location = useLocation();
+  const { showNotification } = useNotification();
 
-  const handleLogin = async (e) => {
-    e.preventDefault();
-    try {
-      const response = await authService.login(identifier, password);
-      if (response.data.token) {
-        navigate('/');
-      }
-    } catch (error) {
-      setError(error.response?.data?.message || 'Login failed. Please try again.');
+  // Vérifier si l'utilisateur est déjà connecté
+  useEffect(() => {
+    if (authService.getCurrentUser()?.isAuthenticated) {
+      navigate('/dashboard');
     }
-  };
+  }, [navigate]);
+
+  const formik = useFormik({
+    initialValues: {
+      usernameOrEmail: '',
+      password: ''
+    },
+    validationSchema: validationSchema,
+    onSubmit: async (values) => {
+      setIsLoading(true);
+      setError('');
+
+      try {
+        await authService.login(values.usernameOrEmail, values.password);
+        showNotification("Successfully logged in!");
+        
+        const intendedUrl = localStorage.getItem('intendedUrl') || '/dashboard';
+        localStorage.removeItem('intendedUrl');
+        navigate(intendedUrl);
+      } catch (err) {
+        const errorMessage = typeof err === 'string' ? err : 'Login failed. Please try again.';
+        setError(errorMessage);
+        showNotification(errorMessage);
+      } finally {
+        setIsLoading(false);
+      }
+    }
+  });
+
+  // Afficher le message de succès après l'inscription
+  React.useEffect(() => {
+    if (location.state?.message) {
+      // Message de succès après inscription
+    }
+  }, [location]);
 
   return (
     <Container component="main" maxWidth="xs">
@@ -122,18 +113,27 @@ const Login = () => {
             </Alert>
           )}
 
-          <Box component="form" onSubmit={handleLogin} sx={{ mt: 1, width: '100%' }}>
+          {location.state?.message && (
+            <Alert severity="success" sx={{ width: '100%', mb: 2 }}>
+              {location.state.message}
+            </Alert>
+          )}
+
+          <Box component="form" onSubmit={formik.handleSubmit} sx={{ mt: 1, width: '100%' }}>
             <TextField
               margin="normal"
               required
               fullWidth
-              id="identifier"
+              id="usernameOrEmail"
               label="Username or Email"
-              name="identifier"
+              name="usernameOrEmail"
               autoComplete="email"
               autoFocus
-              value={identifier}
-              onChange={(e) => setIdentifier(e.target.value)}
+              value={formik.values.usernameOrEmail}
+              onChange={formik.handleChange}
+              error={formik.touched.usernameOrEmail && Boolean(formik.errors.usernameOrEmail)}
+              helperText={formik.touched.usernameOrEmail && formik.errors.usernameOrEmail}
+              disabled={isLoading}
             />
             <TextField
               margin="normal"
@@ -144,8 +144,11 @@ const Login = () => {
               type="password"
               id="password"
               autoComplete="current-password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
+              value={formik.values.password}
+              onChange={formik.handleChange}
+              error={formik.touched.password && Boolean(formik.errors.password)}
+              helperText={formik.touched.password && formik.errors.password}
+              disabled={isLoading}
             />
 
             <Button
@@ -153,8 +156,16 @@ const Login = () => {
               fullWidth
               variant="contained"
               sx={{ mt: 3, mb: 2 }}
+              disabled={isLoading}
             >
-              Sign In
+              {isLoading ? (
+                <>
+                  <CircularProgress size={24} sx={{ mr: 1 }} />
+                  Signing In...
+                </>
+              ) : (
+                'Sign In'
+              )}
             </Button>
 
             <Divider sx={{ my: 2 }}>OR</Divider>

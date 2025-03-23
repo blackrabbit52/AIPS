@@ -1,29 +1,32 @@
 package com.aips.authentication.security;
 
 import com.aips.authentication.model.User;
-import com.fasterxml.jackson.annotation.JsonIgnore;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;
+import lombok.Getter;
 
 import java.util.Collection;
 import java.util.List;
 import java.util.stream.Collectors;
 
+@Getter
 public class UserPrincipal implements UserDetails {
     private final Long id;
     private final String username;
     private final String email;
     private final String password;
     private final Collection<? extends GrantedAuthority> authorities;
+    private final User user;
 
     public UserPrincipal(Long id, String username, String email, String password,
-                        Collection<? extends GrantedAuthority> authorities) {
+                        Collection<? extends GrantedAuthority> authorities, User user) {
         this.id = id;
         this.username = username;
         this.email = email;
         this.password = password;
         this.authorities = authorities;
+        this.user = user;
     }
 
     public static UserPrincipal create(User user) {
@@ -36,7 +39,8 @@ public class UserPrincipal implements UserDetails {
             user.getUsername(),
             user.getEmail(),
             user.getPassword(),
-            authorities
+            authorities,
+            user
         );
     }
 
@@ -48,7 +52,11 @@ public class UserPrincipal implements UserDetails {
     @Override
     public String getPassword() { return password; }
     @Override
-    public Collection<? extends GrantedAuthority> getAuthorities() { return authorities; }
+    public Collection<? extends GrantedAuthority> getAuthorities() {
+        return user.getRoles().stream()
+            .map(role -> new SimpleGrantedAuthority(role.getName().name()))
+            .collect(Collectors.toList());
+    }
     @Override
     public boolean isAccountNonExpired() { return true; }
     @Override

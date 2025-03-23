@@ -1,24 +1,28 @@
 package com.aips.authentication.controller;
 
+import com.aips.authentication.dto.SignUpRequest;
 import com.aips.authentication.dto.UserResponse;
 import com.aips.authentication.service.UserService;
 import com.aips.authentication.repository.UserRepository;
-import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import jakarta.validation.Valid;
 import java.util.List;
-import com.aips.authentication.dto.SignUpRequest;
 
 @RestController
-@RequestMapping("/api/v1/users")
-@RequiredArgsConstructor
+@RequestMapping("/users")
+@CrossOrigin(origins = "http://localhost:3000")
 public class UserController {
 
     private final UserService userService;
     private final UserRepository userRepository;
+
+    public UserController(UserService userService, UserRepository userRepository) {
+        this.userService = userService;
+        this.userRepository = userRepository;
+    }
 
     @GetMapping
     @PreAuthorize("hasAuthority('user:read')")
@@ -33,14 +37,8 @@ public class UserController {
     }
 
     @PostMapping("/superuser")
-    @PreAuthorize("hasAuthority('admin:access')")
-    public ResponseEntity<?> createSuperUser(@RequestParam String username,
-                                           @RequestParam String email,
-                                           @RequestParam String password) {
-        SignUpRequest request = new SignUpRequest();
-        request.setUsername(username);
-        request.setEmail(email);
-        request.setPassword(password);
+    public ResponseEntity<?> createSuperUser(@RequestBody SignUpRequest request) {
+        System.out.println("Attempting to create superuser: " + request.getUsername());
         return userService.registerSuperAdmin(request);
     }
 

@@ -6,6 +6,8 @@ import org.springframework.security.core.userdetails.UserDetails;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonManagedReference;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import lombok.Getter;
+import lombok.Setter;
 
 import jakarta.persistence.*;
 import java.time.LocalDateTime;
@@ -13,6 +15,7 @@ import java.util.Collection;
 import java.util.HashSet;
 import java.util.Set;
 import java.util.stream.Collectors;
+import java.util.List;
 
 @Entity
 @Table(name = "users")
@@ -46,9 +49,11 @@ public class User implements UserDetails {
     private boolean enabled = true;
 
     @ManyToMany(fetch = FetchType.EAGER)
-    @JoinTable(name = "user_roles",
+    @JoinTable(
+        name = "user_roles",
         joinColumns = @JoinColumn(name = "user_id"),
-        inverseJoinColumns = @JoinColumn(name = "role_id"))
+        inverseJoinColumns = @JoinColumn(name = "role_id")
+    )
     private Set<Role> roles = new HashSet<>();
 
     // Constructeur par défaut
@@ -182,5 +187,16 @@ public class User implements UserDetails {
 
     public void setPassword(String password) {
         this.password = password;
+    }
+
+    public Set<Role.RoleType> getRoleNames() {
+        return roles.stream()
+                .map(Role::getName)
+                .collect(Collectors.toSet());
+    }
+
+    public boolean hasRole(Role.RoleType roleType) {
+        return roles.stream()
+                .anyMatch(role -> role.getName() == roleType);
     }
 } 

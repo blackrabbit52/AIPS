@@ -1,20 +1,21 @@
 package com.aips.authentication.exception;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.ExceptionHandler;
+import org.springframework.web.bind.annotation.RestControllerAdvice;
+import java.util.HashMap;
+import java.util.Map;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
-import org.springframework.web.bind.annotation.ExceptionHandler;
-import org.springframework.web.bind.annotation.ResponseStatus;
-import org.springframework.web.bind.annotation.RestControllerAdvice;
 
-import java.util.HashMap;
-import java.util.Map;
-
+/**
+ * Global exception handler for the application
+ */
 @RestControllerAdvice
 public class GlobalExceptionHandler {
 
@@ -26,7 +27,6 @@ public class GlobalExceptionHandler {
      * @param ex Validation exception
      * @return Map of field errors
      */
-    @ResponseStatus(HttpStatus.BAD_REQUEST)
     @ExceptionHandler(MethodArgumentNotValidException.class)
     public Map<String, String> handleValidationExceptions(MethodArgumentNotValidException ex) {
         Map<String, String> errors = new HashMap<>();
@@ -81,16 +81,25 @@ public class GlobalExceptionHandler {
     }
 
     /**
-     * Handle all other exceptions.
-     *
-     * @param ex Exception
-     * @return Error response
+     * Handle all uncaught exceptions
+     * @param ex The exception that was thrown
+     * @return ResponseEntity with error message
      */
     @ExceptionHandler(Exception.class)
-    public ResponseEntity<?> handleGlobalException(Exception ex) {
+    public ResponseEntity<String> handleAllExceptions(Exception ex) {
         logger.error("Unexpected error occurred", ex);
-        Map<String, String> response = new HashMap<>();
-        response.put("error", "An unexpected error occurred");
-        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(response);
+        return ResponseEntity.internalServerError()
+            .body("An unexpected error occurred: " + ex.getMessage());
+    }
+
+    /**
+     * Handle specific runtime exceptions
+     * @param ex The runtime exception that was thrown
+     * @return ResponseEntity with error message
+     */
+    @ExceptionHandler(RuntimeException.class)
+    public ResponseEntity<String> handleRuntimeException(RuntimeException ex) {
+        logger.error("Runtime error occurred", ex);
+        return ResponseEntity.badRequest().body(ex.getMessage());
     }
 } 
