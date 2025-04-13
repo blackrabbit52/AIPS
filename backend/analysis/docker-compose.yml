@@ -1,0 +1,78 @@
+version: '3.8'
+
+services:
+  analysis_api:
+    build: 
+      context: .
+      dockerfile: Dockerfile
+    container_name: aips_analysis_service
+    env_file:
+      - .env
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./data/datasets:/app/data/datasets
+      - ./data/models:/app/data/models
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/health/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 5s
+    depends_on:
+      - analysis_db
+      - redis
+      - celery_worker
+
+  analysis_db:
+    image: postgres:13-alpine
+    container_name: aips_analysis_db
+    hostname: analysis-db
+    environment:
+      - POSTGRES_DB=${DB_NAME}
+      - POSTGRES_USER=${DB_USER}
+      - POSTGRES_PASSWORD=${DB_PASSWORD}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5436:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:6-alpine
+    container_name: aips_analysis_redis
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  celery_worker:
+    build: 
+      context: .
+      dockerfile: Dockerfile
+    container_name: aips_analysis_celery
+    command: celery -A analysis worker -l info
+    env_file:
+      - .env
+    volumes:
+      - ./data/datasets:/app/data/datasets
+      - ./data/models:/app/data/models
+      - ./entrypoint-celery.sh:/entrypoint-celery.sh
+    entrypoint: ["/entrypoint-celery.sh"]
+    depends_on:
+      - redis
+      - analysis_db
+
+volumes:
+  postgres_data:
+
+networks:
+  default:
+    name: aips_analysis_network 

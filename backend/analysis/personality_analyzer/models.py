@@ -1,6 +1,7 @@
 from django.db import models
 from django.contrib.postgres.fields import ArrayField
 from django.utils import timezone
+from django.core.exceptions import ValidationError
 
 class Dataset(models.Model):
     """Model to track downloaded datasets"""
@@ -12,9 +13,17 @@ class Dataset(models.Model):
     download_date = models.DateTimeField(auto_now_add=True)
     last_used = models.DateTimeField(auto_now=True)
     metadata = models.JSONField(default=dict)
+    type = models.CharField(max_length=50, default='MBTI')  # 'MBTI', 'OCEAN'
 
     class Meta:
         unique_together = ('source', 'dataset_id')
+
+    def __str__(self):
+        return f"{self.name} ({self.source})"
+    
+    def get_age(self):
+        """Returns the age of the dataset in days"""
+        return (timezone.now() - self.download_date).days
 
 class TrainedModel(models.Model):
     """Model to track trained ML models"""
@@ -27,6 +36,13 @@ class TrainedModel(models.Model):
     metrics = models.JSONField(default=dict)  # Training metrics
     datasets_used = models.ManyToManyField(Dataset)
     parameters = models.JSONField(default=dict)  # Model hyperparameters
+
+    def __str__(self):
+        return f"{self.name} v{self.version} ({self.model_type})"
+    
+    def is_recent(self, days=30):
+        """Check if model was trained/used recently"""
+        return (timezone.now() - self.last_used).days < days
 
 class PersonalityAnalysis(models.Model):
     """Model to store personality analysis results"""
@@ -53,6 +69,16 @@ class PersonalityAnalysis(models.Model):
     raw_text_analyzed = models.TextField(null=True)  # Optional storage of analyzed text
     model_versions = models.JSONField()  # Versions of models used for analysis
     
+    def clean(self):
+        if len(self.mbti_type) != 4 or not all(c in 'IEFSNTJP' for c in self.mbti_type):
+            raise ValidationError('Invalid MBTI type format')
+    
+    def get_dominant_traits(self):
+        """Returns the dominant personality traits"""
+        ocean_dominant = {k: v for k, v in self.ocean_scores.items() 
+                         if float(v) > 0.7}  # Seuil à 70%
+        return ocean_dominant
+
     class Meta:
         indexes = [
             models.Index(fields=['username', 'social_platform']),

@@ -77,6 +77,19 @@ DATABASES = {
     )
 }
 
+# Fallback to individual database parameters if DATABASE_URL is not available
+if DATABASES['default'] == {}:
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.postgresql',
+            'NAME': env('DB_NAME'),
+            'USER': env('DB_USER'),
+            'PASSWORD': env('DB_PASSWORD'),
+            'HOST': env('DB_HOST'),
+            'PORT': env('DB_PORT'),
+        }
+    }
+
 # Password validation
 AUTH_PASSWORD_VALIDATORS = [
     {
@@ -110,7 +123,7 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 # REST Framework settings
 REST_FRAMEWORK = {
     'DEFAULT_PERMISSION_CLASSES': [
-        'rest_framework.permissions.IsAuthenticated',
+        'rest_framework.permissions.AllowAny',
     ],
     'DEFAULT_AUTHENTICATION_CLASSES': [
         'rest_framework.authentication.SessionAuthentication',
@@ -164,5 +177,41 @@ os.makedirs(DATASETS_DIR, exist_ok=True)
 ELASTICSEARCH_DSL = {
     'default': {
         'hosts': 'elasticsearch:9200'
+    },
+}
+
+# Ajouter cette ligne à la fin de settings.py
+MODEL_DIR = MODELS_DIR 
+
+# Configure logging to filter health checks
+LOGGING = {
+    'version': 1,
+    'disable_existing_loggers': False,
+    'filters': {
+        'exclude_health_check': {
+            '()': 'django.utils.log.CallbackFilter',
+            'callback': lambda record: 'GET /api/health/' not in record.getMessage()
+        },
+    },
+    'formatters': {
+        'verbose': {
+            'format': '{levelname} {asctime} {module} {message}',
+            'style': '{',
+        },
+    },
+    'handlers': {
+        'console': {
+            'level': 'INFO',
+            'class': 'logging.StreamHandler',
+            'filters': ['exclude_health_check'],
+            'formatter': 'verbose'
+        },
+    },
+    'loggers': {
+        'django': {
+            'handlers': ['console'],
+            'level': 'INFO',
+            'propagate': True,
+        },
     },
 } 
