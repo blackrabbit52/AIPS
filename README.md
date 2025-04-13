@@ -177,6 +177,9 @@ Permissions:
 - API endpoints for analysis requests
 - Asynchronous task processing with Celery
 - Dataset management and model training
+- Progress tracking with visual stepper component
+- Memory-optimized model training process
+- Improved error handling for large datasets
 
 ##### Automatic Dataset Management
 The Analysis Service includes an automated dataset management system that:
@@ -184,6 +187,9 @@ The Analysis Service includes an automated dataset management system that:
 - Supports both MBTI and OCEAN personality models
 - Downloads and organizes datasets by type
 - Tracks dataset metadata and usage statistics
+- Intelligent file format detection and conversion
+- Support for CSV, TSV, Excel, and fixed-width formats
+- Memory-efficient data loading through chunking
 
 Pre-configured datasets include:
 1. MBTI Datasets:
@@ -224,37 +230,61 @@ GET /api/v1/datasets/by_type?type=MBTI|OCEAN
 - Get datasets filtered by type
 - Response: Filtered list of datasets
 
-GET /api/v1/models/
-- List trained models
-- Response: Array of trained models with metrics
-
-GET /api/v1/models/by_type?type=MBTI|OCEAN
-- Get models filtered by type
-- Response: Filtered list of models
-
-POST /api/v1/models/train/
-- Train new personality model
+POST /api/v1/datasets/fetch_and_train/
+- Download datasets and train models in one operation
 - Body: {
-    "dataset_ids": ["int"],
-    "model_type": "MBTI|OCEAN"
+    "model_types": ["MBTI", "OCEAN"],
+    "data_limit": 1000,  # Optional limit for training samples
+    "force_limit": true, # Strictly enforce data limit
+    "check_existing_files": true # Whether to use existing datasets if available
   }
-- Response: Training task status
+- Response: Task status with multi-stage progress tracking
+
+GET /api/v1/analysis/task_status/?task_id=xxx
+- Check status of long-running analysis tasks
+- Response: Task status, progress, and results
+
+GET /api/v1/analysis/check_models_status/
+- Check if models are available for analysis
+- Response: Availability status of personality models
 ```
 
 ##### Dataset Organization
 ```
 data/
 ├── datasets/
-│   ├── mbti/              # MBTI-related datasets
-│   │   ├── personality-types/
-│   │   └── twitter-data/
-│   └── ocean/             # OCEAN-related datasets
-│       ├── big-five-test/
-│       └── facebook-scores/
+│   ├── kaggle/
+│   │   ├── mbti/              # MBTI-related datasets
+│   │   │   ├── mbti-type/
+│   │   │   │   └── mbti_1.csv
+│   │   │   └── twitter-personality-data/
+│   │   └── ocean/             # OCEAN-related datasets
+│   │       ├── big-five-personality-test/
+│   │       │   └── IPIP-FFM-data-8Nov2018/
+│   │       └── facebook-posts-and-personality-scores/
 └── models/
     ├── mbti/             # Trained MBTI models
+    │   ├── model/        # Model files
+    │   ├── tokenizer/    # Tokenizer configuration
+    │   └── results/      # Training results
     └── ocean/            # Trained OCEAN models
+        ├── model/        # Model files
+        ├── tokenizer/    # Tokenizer configuration
+        └── results/      # Training results
 ```
+
+##### Frontend Analysis Features
+- Visual progress tracking for model training process
+- Multi-stage stepper component showing:
+  - Downloading Datasets
+  - Processing Data
+  - Training Models
+  - Finalizing
+- Real-time status updates for model training
+- Responsive error handling with user-friendly messages
+- Dynamic model availability indicators
+- Redirection to contact form when models unavailable
+- Memory-efficient model training visualization
 
 ##### Asynchronous Processing
 The Analysis Service uses Celery for handling time-consuming tasks:
@@ -268,8 +298,9 @@ Tasks are queued in Redis and processed by Celery workers, ensuring:
 - Scalable processing
 - Background execution
 - Task prioritization
-- Progress tracking
+- Progress tracking with detailed step information
 - Error handling and retries
+- Memory-optimized processing for large datasets
 
 #### Recommendation Service (Flask)
 - Personalized recommendations

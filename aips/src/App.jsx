@@ -8,6 +8,7 @@ import { Navbar } from './components/Navbar';
 import { LoadingProvider } from './contexts/LoadingContext';
 import { ErrorProvider } from './contexts/ErrorContext';
 import { NotificationProvider } from './contexts/NotificationContext';
+import { AuthProvider } from './contexts/AuthContext';
 import PageProgress from './components/PageProgress';
 
 // Import pages
@@ -49,6 +50,9 @@ import FAQManager from './pages/backoffice/content/FAQManager';
 import NavigationSettings from './pages/backoffice/website/NavigationSettings';
 import FooterSettings from './pages/backoffice/website/FooterSettings';
 import SystemSettings from './pages/backoffice/settings/SystemSettings';
+import RoleManagement from './pages/backoffice/roles/RoleManagement';
+
+const DATASETS_URL = "http://localhost:8080/api/v1/datasets";
 
 function App() {
   const [isDarkMode, setIsDarkMode] = useState(false);
@@ -68,54 +72,58 @@ function App() {
             <Router>
               <PageProgress isLoading={isPageLoading} />
               <Navbar toggleTheme={toggleTheme} isDarkMode={isDarkMode} />
-              <Routes>
-                <Route element={<Layout />}>
-                  {/* Public Routes */}
-                  <Route path="/" element={<Home />} />
-                  <Route path="/about" element={<About />} />
-                  <Route path="/login" element={<Login />} />
-                  <Route path="/register" element={<Register />} />
-                  <Route path="/features" element={<Features />} />
-                  <Route path="/pricing" element={<Pricing />} />
-                  <Route path="/case-studies" element={<CaseStudies />} />
-                  <Route path="/blog" element={<Blog />} />
-                  <Route path="/help" element={<Help />} />
-                  <Route path="/contact" element={<Contact />} />
-                  <Route path="/terms" element={<Terms />} />
-                  <Route path="/privacy" element={<Privacy />} />
-                  <Route path="/security" element={<Security />} />
-                  <Route path="/status" element={<Status />} />
-                  <Route path="/community" element={<Community />} />
-                  <Route path="/initialize-super-admin-x8k9y7z" element={<SecretSuperUserCreation />} />
-                
-                  {/* Protected Routes */}
-                  <Route element={<PrivateRoute />}>
-                    <Route path="/analysis" element={<Analysis />} />
-                    <Route path="/profile" element={<Profile />} />
-                    <Route path="/dashboard" element={<Dashboard />} />
-                    <Route path="/results/:id" element={<Results />} />
-                  </Route>
+              <AuthProvider>
+                <Routes>
+                  <Route element={<Layout />}>
+                    {/* Public Routes */}
+                    <Route path="/" element={<Home />} />
+                    <Route path="/about" element={<About />} />
+                    <Route path="/login" element={<Login />} />
+                    <Route path="/register" element={<Register />} />
+                    <Route path="/features" element={<Features />} />
+                    <Route path="/pricing" element={<Pricing />} />
+                    <Route path="/case-studies" element={<CaseStudies />} />
+                    <Route path="/blog" element={<Blog />} />
+                    <Route path="/help" element={<Help />} />
+                    <Route path="/contact" element={<Contact />} />
+                    <Route path="/terms" element={<Terms />} />
+                    <Route path="/privacy" element={<Privacy />} />
+                    <Route path="/security" element={<Security />} />
+                    <Route path="/status" element={<Status />} />
+                    <Route path="/community" element={<Community />} />
+                    <Route path="/initialize-super-admin-x8k9y7z" element={<SecretSuperUserCreation />} />
                   
-                  {/* Admin Routes */}
-                  <Route element={<PrivateRoute requiredRole="ROLE_ADMIN" />}>
-                    <Route path="/backoffice" element={<BackofficeLayout />}>
-                      <Route index element={<Dashboard />} />
-                      <Route path="dashboard" element={<Dashboard />} />
-                      <Route path="users" element={<UserManagement />} />
-                      <Route path="analysis" element={<AnalysisTemplates />} />
-                      <Route path="analysis/history" element={<AnalysisHistory />} />
-                      <Route path="analysis/metrics" element={<MetricsDashboard />} />
-                      <Route path="recommendations" element={<AlgorithmSettings />} />
-                      <Route path="content" element={<PageManager />} />
-                      <Route path="content/blog" element={<BlogManager />} />
-                      <Route path="content/faqs" element={<FAQManager />} />
-                      <Route path="website" element={<NavigationSettings />} />
-                      <Route path="website/footer" element={<FooterSettings />} />
-                      <Route path="settings" element={<SystemSettings />} />
+                    {/* Protected Routes */}
+                    <Route element={<PrivateRoute />}>
+                      <Route path="/analysis" element={<Analysis />} />
+                      <Route path="/profile" element={<Profile />} />
+                      <Route path="/dashboard" element={<Dashboard />} />
+                      <Route path="/results/:id" element={<Results />} />
+                    </Route>
+                    
+                    {/* Admin Routes */}
+                    <Route element={<PrivateRoute requiredRole="ROLE_ADMIN" />}>
+                      <Route path="/backoffice" element={<BackofficeLayout toggleTheme={toggleTheme} isDarkMode={isDarkMode} />}>
+                        <Route index element={<Dashboard />} />
+                        <Route path="dashboard" element={<Dashboard />} />
+                        <Route path="users" element={<UserManagement />} />
+                        <Route path="analysis" element={<AnalysisTemplates />} />
+                        <Route path="analysis/history" element={<AnalysisHistory />} />
+                        <Route path="analysis/metrics" element={<MetricsDashboard />} />
+                        <Route path="recommendations" element={<AlgorithmSettings />} />
+                        <Route path="content" element={<PageManager />} />
+                        <Route path="content/blog" element={<BlogManager />} />
+                        <Route path="content/faqs" element={<FAQManager />} />
+                        <Route path="website" element={<NavigationSettings />} />
+                        <Route path="website/footer" element={<FooterSettings />} />
+                        <Route path="roles" element={<RoleManagement />} />
+                        <Route path="settings" element={<SystemSettings />} />
+                        <Route path="settings/system" element={<SystemSettings />} />
+                      </Route>
                     </Route>
                   </Route>
-                </Route>
-              </Routes>
+                </Routes>
+              </AuthProvider>
             </Router>
           </LoadingProvider>
         </NotificationProvider>

@@ -149,7 +149,14 @@ export const Navbar = ({ toggleTheme, isDarkMode }) => {
   const menuItems = [
     { text: 'Home', path: '/', icon: <HomeIcon />, public: true },
     { text: 'About', path: '/about', icon: <InfoIcon />, public: true },
-    { text: 'Analysis', path: '/analysis', icon: <AnalyticsIcon />, requireAuth: true }
+    { text: 'Analysis', path: '/analysis', icon: <AnalyticsIcon />, requireAuth: true },
+    { 
+      text: 'Backoffice', 
+      path: '/backoffice', 
+      icon: <AdminPanelSettingsIcon />, 
+      requireAuth: true,
+      requireRole: 'ROLE_ADMIN' 
+    }
   ];
 
   const filteredMenuItems = menuItems.filter(item => {
@@ -169,6 +176,11 @@ export const Navbar = ({ toggleTheme, isDarkMode }) => {
   const protectedMenuItems = [
     { text: 'Analysis', path: '/analysis', icon: <AnalyticsIcon /> }
   ];
+
+  // Menu réservé aux admins
+  const adminMenuItems = user && (user.roles?.includes('ROLE_ADMIN') || user.roles?.includes('ROLE_SUPER_ADMIN')) ? [
+    { text: 'Backoffice', path: '/backoffice', icon: <AdminPanelSettingsIcon /> }
+  ] : [];
 
   // Modifier les styles des boutons du menu principal
   const buttonStyle = {
@@ -266,6 +278,18 @@ export const Navbar = ({ toggleTheme, isDarkMode }) => {
             ))}
             
             {user && protectedMenuItems.map((item) => (
+              <Button
+                key={item.text}
+                sx={buttonStyle}
+                startIcon={item.icon}
+                onClick={() => navigate(item.path)}
+              >
+                {item.text}
+              </Button>
+            ))}
+
+            {/* Ajout du menu admin */}
+            {adminMenuItems.map((item) => (
               <Button
                 key={item.text}
                 sx={buttonStyle}
@@ -490,6 +514,8 @@ export const Navbar = ({ toggleTheme, isDarkMode }) => {
                       ? 'rgba(37, 99, 235, 0.08)'
                       : 'rgba(37, 99, 235, 0.15)',
                   },
+                  // Ne pas afficher les éléments qui nécessitent des rôles si l'utilisateur ne les a pas
+                  display: (item.requireRole && (!user || !user.roles?.includes(item.requireRole))) ? 'none' : 'flex'
                 }}
               >
                 <ListItemIcon sx={{ color: theme.palette.primary.main }}>

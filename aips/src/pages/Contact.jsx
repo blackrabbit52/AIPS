@@ -1,14 +1,64 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Container, Typography, Grid, TextField, Button, Card, CardContent, Box, Alert } from '@mui/material';
-import { Email, Phone, LocationOn } from '@mui/icons-material';
+import { Email, Phone, LocationOn, AttachFile } from '@mui/icons-material';
+import { useLocation } from 'react-router-dom';
+import { useAuth } from '../contexts/AuthContext'; // Supposons qu'il existe un contexte d'authentification
 
 const Contact = () => {
   const [formStatus, setFormStatus] = useState('');
+  const [message, setMessage] = useState('');
+  const [file, setFile] = useState(null);
+  const location = useLocation();
+  const { user } = useAuth(); // Récupération des informations de l'utilisateur connecté
+
+  // Valeurs par défaut des champs du formulaire
+  const [formValues, setFormValues] = useState({
+    firstName: '',
+    lastName: '',
+    email: '',
+    subject: 'Problème avec les modèles d\'analyse'
+  });
+
+  // Pré-remplir les champs si l'utilisateur est connecté
+  useEffect(() => {
+    if (user) {
+      setFormValues({
+        firstName: user.firstName || '',
+        lastName: user.lastName || '',
+        email: user.email || '',
+        subject: location.state?.subject || 'Problème avec les modèles d\'analyse'
+      });
+    }
+  }, [user, location]);
+
+  const handleFileChange = (event) => {
+    setFile(event.target.files[0]);
+  };
+
+  const handleMessageChange = (event) => {
+    setMessage(event.target.value);
+  };
 
   const handleSubmit = (event) => {
     event.preventDefault();
+    
+    // Création d'un objet FormData pour l'envoi du fichier
+    const formData = new FormData();
+    formData.append('firstName', formValues.firstName);
+    formData.append('lastName', formValues.lastName);
+    formData.append('email', formValues.email);
+    formData.append('subject', formValues.subject);
+    formData.append('message', message);
+    if (file) {
+      formData.append('file', file);
+    }
+    
+    // Ici, vous ajouteriez la logique d'envoi du formulaire avec le fichier
+    // par exemple: await contactService.submitContactForm(formData);
+    
     setFormStatus('success');
-    // Add actual form submission logic here
+    setMessage('');
+    setFile(null);
   };
 
   const contactInfo = [
@@ -77,6 +127,11 @@ const Contact = () => {
                       fullWidth
                       label="First Name"
                       required
+                      value={formValues.firstName}
+                      disabled={user && user.firstName}
+                      InputProps={{
+                        readOnly: user && user.firstName,
+                      }}
                     />
                   </Grid>
                   <Grid item xs={12} sm={6}>
@@ -84,6 +139,11 @@ const Contact = () => {
                       fullWidth
                       label="Last Name"
                       required
+                      value={formValues.lastName}
+                      disabled={user && user.lastName}
+                      InputProps={{
+                        readOnly: user && user.lastName,
+                      }}
                     />
                   </Grid>
                   <Grid item xs={12}>
@@ -92,6 +152,11 @@ const Contact = () => {
                       label="Email"
                       type="email"
                       required
+                      value={formValues.email}
+                      disabled={user && user.email}
+                      InputProps={{
+                        readOnly: user && user.email,
+                      }}
                     />
                   </Grid>
                   <Grid item xs={12}>
@@ -99,6 +164,7 @@ const Contact = () => {
                       fullWidth
                       label="Subject"
                       required
+                      value={formValues.subject}
                     />
                   </Grid>
                   <Grid item xs={12}>
@@ -108,7 +174,29 @@ const Contact = () => {
                       multiline
                       rows={4}
                       required
+                      value={message}
+                      onChange={handleMessageChange}
                     />
+                  </Grid>
+                  <Grid item xs={12}>
+                    <Button
+                      component="label"
+                      variant="outlined"
+                      startIcon={<AttachFile />}
+                      sx={{ mb: 2 }}
+                    >
+                      Joindre un fichier
+                      <input
+                        type="file"
+                        hidden
+                        onChange={handleFileChange}
+                      />
+                    </Button>
+                    {file && (
+                      <Typography variant="body2" sx={{ ml: 2, display: 'inline' }}>
+                        {file.name}
+                      </Typography>
+                    )}
                   </Grid>
                   <Grid item xs={12}>
                     <Button

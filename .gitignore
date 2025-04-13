@@ -9,11 +9,27 @@ data/
 backend/analysis/data/
 backend/recommendation/data/
 
+# Analysis specific directories
+backend/analysis/data/datasets/
+backend/analysis/data/models/
+backend/analysis/data/downloads/
+backend/analysis/models/
+backend/analysis/.kaggle/
+
 # Model files
 *.h5
 *.pkl
 *.model
 *.joblib
+*.pt
+*.bin
+*.onnx
+**/model_state_dict.pt
+**/tokenizer.json
+**/tokenizer_config.json
+**/special_tokens_map.json
+**/vocab.txt
+**/merges.txt
 
 # Datasets
 *.csv
@@ -26,6 +42,12 @@ __pycache__/
 *.py[cod]
 *$py.class
 .cache/
+
+# Docker volume data
+**/postgres-data/
+**/redis-data/
+**/elasticsearch-data/
+**/celery-data/
 
 # Virtual environments
 venv/
