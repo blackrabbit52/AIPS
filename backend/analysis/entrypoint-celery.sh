@@ -1,6 +1,9 @@
 #!/bin/bash
 set -e
 
+# Change to the correct directory
+cd /app
+
 # Wait for the database to be ready
 echo "Waiting for database to be ready..."
 python -c "
@@ -28,16 +31,12 @@ echo "Database is ready!"
 echo "Checking installed Kaggle version:"
 pip show kaggle
 
-# Configure Kaggle authentication if credentials are provided
-if [ ! -z "$KAGGLE_USERNAME" ] && [ ! -z "$KAGGLE_KEY" ]; then
-  echo "Configuring Kaggle authentication..."
-  mkdir -p /root/.kaggle
-  echo "{\"username\":\"$KAGGLE_USERNAME\",\"key\":\"$KAGGLE_KEY\"}" > /root/.kaggle/kaggle.json
-  chmod 600 /root/.kaggle/kaggle.json
-  echo "Kaggle authentication configured."
-else
-  echo "Kaggle credentials not provided as environment variables. Skipping Kaggle configuration."
-fi
+# Configure Kaggle authentication
+echo "Configuring Kaggle authentication..."
+mkdir -p /root/.kaggle
+echo "{\"username\":\"brucesiani\",\"key\":\"559c5ffec8dbf9b6b2fdad3f156a2d81\"}" > /root/.kaggle/kaggle.json
+chmod 600 /root/.kaggle/kaggle.json
+echo "Kaggle authentication configured."
 
 # Apply database migrations
 echo "Applying database migrations..."

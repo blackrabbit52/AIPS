@@ -1,13 +1,19 @@
 package com.aips.authentication.controller;
 
 import com.aips.authentication.dto.SignUpRequest;
+import com.aips.authentication.dto.UserDTO;
 import com.aips.authentication.dto.UserResponse;
 import com.aips.authentication.service.UserService;
 import com.aips.authentication.repository.UserRepository;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import java.util.List;
 
@@ -16,6 +22,7 @@ import java.util.List;
 @CrossOrigin(origins = "http://localhost:3000")
 public class UserController {
 
+    private static final Logger logger = LoggerFactory.getLogger(UserController.class);
     private final UserService userService;
     private final UserRepository userRepository;
 
@@ -25,15 +32,49 @@ public class UserController {
     }
 
     @GetMapping
-    @PreAuthorize("hasAuthority('user:read')")
-    public ResponseEntity<List<UserResponse>> getAllUsers() {
-        return ResponseEntity.ok(userService.getAllUsers());
+    @PreAuthorize("hasAnyRole('ROLE_ADMIN', 'ROLE_SUPER_ADMIN')")
+    public ResponseEntity<List<UserResponse>> getAllUsers(HttpServletRequest request) {
+        logger.info("Received request to get all users");
+        logger.info("Request URI: {}", request.getRequestURI());
+        logger.info("Context Path: {}", request.getContextPath());
+        logger.info("Servlet Path: {}", request.getServletPath());
+        logger.info("Path Info: {}", request.getPathInfo());
+        
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        logger.debug("Current authentication: {}", auth);
+        logger.debug("Current user: {}", auth != null ? auth.getName() : "anonymous");
+        logger.debug("Current authorities: {}", auth != null ? auth.getAuthorities() : "none");
+
+        try {
+            logger.info("Attempting to fetch all users");
+            List<UserResponse> users = userService.getAllUsers();
+            logger.info("Successfully fetched {} users", users.size());
+            return ResponseEntity.ok(users);
+        } catch (Exception e) {
+            logger.error("Error fetching users: ", e);
+            throw e;
+        }
     }
 
     @GetMapping("/{id}")
-    @PreAuthorize("hasAuthority('user:read')")
+    @PreAuthorize("hasAnyRole('ROLE_ADMIN', 'ROLE_SUPER_ADMIN')")
     public ResponseEntity<UserResponse> getUserById(@PathVariable Long id) {
-        return ResponseEntity.ok(userService.getUserById(id));
+        logger.info("Received request to get user by id: {}", id);
+        
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        logger.debug("Current authentication: {}", auth);
+        logger.debug("Current user: {}", auth != null ? auth.getName() : "anonymous");
+        logger.debug("Current authorities: {}", auth != null ? auth.getAuthorities() : "none");
+
+        try {
+            logger.info("Attempting to fetch user with id: {}", id);
+            UserResponse user = userService.getUserById(id);
+            logger.info("Successfully fetched user: {}", user);
+            return ResponseEntity.ok(user);
+        } catch (Exception e) {
+            logger.error("Error fetching user with id {}: ", id, e);
+            throw e;
+        }
     }
 
     @PostMapping("/superuser")
@@ -43,14 +84,14 @@ public class UserController {
     }
 
     @PutMapping("/{id}")
-    @PreAuthorize("hasAuthority('user:update')")
+    @PreAuthorize("hasAnyRole('ROLE_ADMIN', 'ROLE_SUPER_ADMIN')")
     public ResponseEntity<UserResponse> updateUser(@PathVariable Long id,
-                                                 @Valid @RequestBody UserResponse userRequest) {
+                                            @Valid @RequestBody UserResponse userRequest) {
         return ResponseEntity.ok(userService.updateUser(id, userRequest));
     }
 
     @DeleteMapping("/{id}")
-    @PreAuthorize("hasAuthority('user:delete')")
+    @PreAuthorize("hasAnyRole('ROLE_ADMIN', 'ROLE_SUPER_ADMIN')")
     public ResponseEntity<Void> deleteUser(@PathVariable Long id) {
         userService.deleteUser(id);
         return ResponseEntity.ok().build();

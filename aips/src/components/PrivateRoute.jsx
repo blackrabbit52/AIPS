@@ -1,24 +1,47 @@
 import { Navigate, useLocation, Outlet } from 'react-router-dom';
 import authService from '../services/auth.service';
+import { useEffect, useState } from 'react';
 
 const PrivateRoute = ({ requiredRole }) => {
   const location = useLocation();
-  const currentUser = authService.getCurrentUser();
+  const [isLoading, setIsLoading] = useState(true);
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
 
-  // Debug authentication state
-  console.log('Route protection check:', {
-    currentUser,
-    token: localStorage.getItem('token'),
-    currentPath: location.pathname
-  });
+  useEffect(() => {
+    const checkAuth = async () => {
+      try {
+        const token = localStorage.getItem('token');
+        const user = authService.getCurrentUser();
+        
+        if (token && user) {
+          setIsAuthenticated(true);
+        } else {
+          setIsAuthenticated(false);
+          localStorage.removeItem('token');
+          localStorage.removeItem('user');
+        }
+      } catch (error) {
+        console.error('Auth check error:', error);
+        setIsAuthenticated(false);
+        localStorage.removeItem('token');
+        localStorage.removeItem('user');
+      } finally {
+        setIsLoading(false);
+      }
+    };
 
-  // Vérification plus stricte de l'authentification
-  if (!currentUser || !localStorage.getItem('token')) {
+    checkAuth();
+  }, [location]);
+
+  if (isLoading) {
+    return null; // ou un composant de chargement
+  }
+
+  if (!isAuthenticated) {
     localStorage.setItem('intendedUrl', location.pathname);
     return <Navigate to="/login" state={{ from: location }} replace />;
   }
 
-  // Vérification du rôle si nécessaire
   if (requiredRole && !authService.hasRole(requiredRole)) {
     return <Navigate to="/" replace />;
   }

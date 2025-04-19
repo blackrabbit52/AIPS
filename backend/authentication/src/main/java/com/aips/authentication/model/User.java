@@ -3,19 +3,16 @@ package com.aips.authentication.model;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;
-import com.fasterxml.jackson.annotation.JsonProperty;
-import com.fasterxml.jackson.annotation.JsonManagedReference;
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
-import lombok.Getter;
-import lombok.Setter;
-
 import jakarta.persistence.*;
+
 import java.time.LocalDateTime;
 import java.util.Collection;
 import java.util.HashSet;
 import java.util.Set;
 import java.util.stream.Collectors;
-import java.util.List;
+import java.util.Objects;
 
 @Entity
 @Table(name = "users")
@@ -30,6 +27,7 @@ public class User implements UserDetails {
     @Column(unique = true, nullable = false)
     private String email;
 
+    @JsonIgnore
     @Column(nullable = false)
     private String password;
 
@@ -54,12 +52,12 @@ public class User implements UserDetails {
         joinColumns = @JoinColumn(name = "user_id"),
         inverseJoinColumns = @JoinColumn(name = "role_id")
     )
+    @JsonIgnoreProperties("users")
     private Set<Role> roles = new HashSet<>();
 
-    // Constructeur par défaut
-    public User() {}
+    public User() {
+    }
 
-    // Constructeur avec paramètres
     public User(String username, String email, String password) {
         this.username = username;
         this.email = email;
@@ -77,6 +75,7 @@ public class User implements UserDetails {
         updatedAt = LocalDateTime.now();
     }
 
+    @JsonIgnore
     @Override
     public Collection<? extends GrantedAuthority> getAuthorities() {
         return roles.stream()
@@ -84,31 +83,36 @@ public class User implements UserDetails {
             .collect(Collectors.toList());
     }
 
-    @Override
-    public String getPassword() {
-        return password;
-    }
-
-    @Override
-    public String getUsername() {
-        return username;
-    }
-
+    @JsonIgnore
     @Override
     public boolean isAccountNonExpired() {
         return true;
     }
 
+    @JsonIgnore
     @Override
     public boolean isAccountNonLocked() {
         return true;
     }
 
+    @JsonIgnore
     @Override
     public boolean isCredentialsNonExpired() {
         return true;
     }
 
+    public Set<Role.RoleType> getRoleNames() {
+        return roles.stream()
+            .map(Role::getName)
+            .collect(Collectors.toSet());
+    }
+
+    public boolean hasRole(Role.RoleType roleType) {
+        return roles.stream()
+            .anyMatch(role -> role.getName().equals(roleType));
+    }
+
+    // Getters and Setters
     public Long getId() {
         return id;
     }
@@ -117,12 +121,30 @@ public class User implements UserDetails {
         this.id = id;
     }
 
+    @Override
+    public String getUsername() {
+        return username;
+    }
+
+    public void setUsername(String username) {
+        this.username = username;
+    }
+
     public String getEmail() {
         return email;
     }
 
     public void setEmail(String email) {
         this.email = email;
+    }
+
+    @Override
+    public String getPassword() {
+        return password;
+    }
+
+    public void setPassword(String password) {
+        this.password = password;
     }
 
     public String getFirstName() {
@@ -165,6 +187,7 @@ public class User implements UserDetails {
         this.lastLogin = lastLogin;
     }
 
+    @Override
     public boolean isEnabled() {
         return enabled;
     }
@@ -181,22 +204,30 @@ public class User implements UserDetails {
         this.roles = roles;
     }
 
-    public void setUsername(String username) {
-        this.username = username;
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (o == null || getClass() != o.getClass()) return false;
+        User user = (User) o;
+        return Objects.equals(id, user.id) &&
+               Objects.equals(username, user.username) &&
+               Objects.equals(email, user.email);
     }
 
-    public void setPassword(String password) {
-        this.password = password;
+    @Override
+    public int hashCode() {
+        return Objects.hash(id, username, email);
     }
 
-    public Set<Role.RoleType> getRoleNames() {
-        return roles.stream()
-                .map(Role::getName)
-                .collect(Collectors.toSet());
-    }
-
-    public boolean hasRole(Role.RoleType roleType) {
-        return roles.stream()
-                .anyMatch(role -> role.getName() == roleType);
+    @Override
+    public String toString() {
+        return "User{" +
+               "id=" + id +
+               ", username='" + username + '\'' +
+               ", email='" + email + '\'' +
+               ", firstName='" + firstName + '\'' +
+               ", lastName='" + lastName + '\'' +
+               ", enabled=" + enabled +
+               '}';
     }
 } 

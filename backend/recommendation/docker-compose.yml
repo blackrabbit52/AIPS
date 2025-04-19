@@ -1,0 +1,49 @@
+ services:
+  recommendation_api:
+    build: 
+      context: .
+      dockerfile: Dockerfile
+    container_name: aips_recommendation_service
+    env_file:
+      - .env
+    ports:
+      - "8001:8000"
+    volumes:
+      - ./app:/app
+      - ./migrations:/app/migrations
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/health/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 5s
+    depends_on:
+      - recommendation_db
+      - redis
+      - analysis_api
+
+  recommendation_db:
+    image: postgres:13-alpine
+    container_name: aips_recommendation_db
+    hostname: recommendation-db
+    environment:
+      - POSTGRES_DB=${DB_NAME}
+      - POSTGRES_USER=${DB_USER}
+      - POSTGRES_PASSWORD=${DB_PASSWORD}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5437:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  postgres_data:
+
+networks:
+  default:
+    name: aips_network
+    external: true

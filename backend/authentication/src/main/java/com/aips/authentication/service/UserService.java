@@ -13,9 +13,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
-import org.springframework.security.core.userdetails.UserDetails;
-import org.springframework.security.core.userdetails.UserDetailsService;
-import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -23,11 +20,12 @@ import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
 
 @Service
-public class UserService implements UserDetailsService {
+public class UserService {
 
     private static final Logger logger = LoggerFactory.getLogger(UserService.class);
 
@@ -43,76 +41,27 @@ public class UserService implements UserDetailsService {
         this.passwordEncoder = passwordEncoder;
     }
 
-    /**
-     * Load user by username for Spring Security authentication.
-     *
-     * @param usernameOrEmail Username or email to search for
-     * @return UserDetails object for Spring Security
-     * @throws UsernameNotFoundException if user not found
-     */
-    @Override
-    @Transactional(readOnly = true)
-    public UserDetails loadUserByUsername(String usernameOrEmail) throws UsernameNotFoundException {
-        logger.info("Tentative de chargement de l'utilisateur: {}", usernameOrEmail);
-        
-        User user = userRepository.findByUsernameOrEmail(usernameOrEmail, usernameOrEmail)
-            .orElseThrow(() -> {
-                logger.error("Utilisateur non trouvé: {}", usernameOrEmail);
-                return new UsernameNotFoundException("Utilisateur non trouvé avec le username ou email: " + usernameOrEmail);
-            });
-            
-        logger.info("Utilisateur trouvé: {}", user.getUsername());
-        return UserPrincipal.create(user);
-    }
-
-    /**
-     * Get current authenticated user.
-     *
-     * @param authentication Current authentication object
-     * @return User object for the authenticated user
-     * @throws UsernameNotFoundException if user not found
-     */
     @Transactional(readOnly = true)
     public User getCurrentUser(Authentication authentication) {
         if (authentication == null) {
             return null;
         }
         return userRepository.findByUsername(authentication.getName())
-            .orElseThrow(() -> new UsernameNotFoundException("User not found: " + authentication.getName()));
+            .orElseThrow(() -> new RuntimeException("User not found: " + authentication.getName()));
     }
 
-    /**
-     * Find user by username.
-     *
-     * @param username Username to search for
-     * @return User object if found
-     */
     @Transactional(readOnly = true)
     public User findByUsername(String username) {
         return userRepository.findByUsername(username)
-            .orElseThrow(() -> new UsernameNotFoundException("User not found: " + username));
+            .orElseThrow(() -> new RuntimeException("User not found: " + username));
     }
 
-    /**
-     * Find user by email.
-     *
-     * @param email Email to search for
-     * @return User object if found
-     */
     @Transactional(readOnly = true)
     public User findByEmail(String email) {
         return userRepository.findByEmail(email)
-            .orElseThrow(() -> new UsernameNotFoundException("User not found with email: " + email));
+            .orElseThrow(() -> new RuntimeException("User not found with email: " + email));
     }
 
-    /**
-     * Update user profile information.
-     *
-     * @param user User to update
-     * @param firstName New first name
-     * @param lastName New last name
-     * @return Updated user
-     */
     @Transactional
     public User updateProfile(User user, String firstName, String lastName) {
         user.setFirstName(firstName);
@@ -121,19 +70,95 @@ public class UserService implements UserDetailsService {
     }
 
     public List<UserResponse> getAllUsers() {
-        return userRepository.findAll().stream()
-                .map(this::convertToUserResponse)
+        System.out.println("[UserService] Getting all users");
+        List<User> users = userRepository.findAll();
+        System.out.println("[UserService] Found " + users.size() + " users");
+        return users.stream()
+                .map(user -> {
+                    System.out.println("[UserService] Converting user " + user.getUsername() + " to response");
+                    return convertToUserResponse(user);
+                })
                 .collect(Collectors.toList());
     }
 
     public UserResponse getUserById(Long id) {
         return userRepository.findById(id)
                 .map(this::convertToUserResponse)
-                .orElseThrow(() -> new ResourceNotFoundException("User not found with id: " + id));
+                .orElseThrow(() -> new RuntimeException("User not found"));
+    }
+
+    public Optional<User> getUserByUsername(String username) {
+        return userRepository.findByUsername(username);
+    }
+
+    @Transactional
+    public UserResponse createUser(UserResponse userRequest) {
+        if (userRepository.existsByUsername(userRequest.getUsername())) {
+            throw new RuntimeException("Username already exists");
+        }
+        if (userRepository.existsByEmail(userRequest.getEmail())) {
+            throw new RuntimeException("Email already exists");
+        }
+
+        User user = new User();
+        user.setUsername(userRequest.getUsername());
+        user.setEmail(userRequest.getEmail());
+        return convertToUserResponse(userRepository.save(user));
     }
 
     @Transactional
     public UserResponse updateUser(Long id, UserResponse userRequest) {
+        User user = userRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("User not found"));
+        
+        if (!user.getUsername().equals(userRequest.getUsername()) && 
+            userRepository.existsByUsername(userRequest.getUsername())) {
+            throw new RuntimeException("Username already exists");
+        }
+        if (!user.getEmail().equals(userRequest.getEmail()) && 
+            userRepository.existsByEmail(userRequest.getEmail())) {
+            throw new RuntimeException("Email already exists");
+        }
+        
+        user.setUsername(userRequest.getUsername());
+        user.setEmail(userRequest.getEmail());
+        return convertToUserResponse(userRepository.save(user));
+    }
+
+    @Transactional
+    public void deleteUser(Long id) {
+        User user = userRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("User not found"));
+        userRepository.delete(user);
+    }
+
+    public List<String> getUserRoles(Long userId) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new RuntimeException("User not found"));
+        return user.getRoles().stream()
+                .map(role -> role.getName().name())
+                .collect(Collectors.toList());
+    }
+
+    public Set<String> getUserRoleNames(Long userId) {
+        return getUserRoles(userId).stream()
+                .collect(Collectors.toSet());
+    }
+
+    public List<UserResponse> getAllUsersResponse() {
+        return userRepository.findAll().stream()
+                .map(this::convertToUserResponse)
+                .collect(Collectors.toList());
+    }
+
+    public UserResponse getUserByIdResponse(Long id) {
+        return userRepository.findById(id)
+                .map(this::convertToUserResponse)
+                .orElseThrow(() -> new ResourceNotFoundException("User not found with id: " + id));
+    }
+
+    @Transactional
+    public UserResponse updateUserResponse(Long id, UserResponse userRequest) {
         User user = userRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("User not found with id: " + id));
 
@@ -151,47 +176,39 @@ public class UserService implements UserDetailsService {
         return convertToUserResponse(userRepository.save(user));
     }
 
-    @Transactional
-    public void deleteUser(Long id) {
-        if (!userRepository.existsById(id)) {
-            throw new ResourceNotFoundException("User not found with id: " + id);
-        }
-        userRepository.deleteById(id);
-    }
-
     private UserResponse convertToUserResponse(User user) {
+        if (user == null) {
+            System.out.println("[UserService] User is null, returning null response");
+            return null;
+        }
+        System.out.println("[UserService] Converting user " + user.getUsername() + " to response");
         return new UserResponse(
             user.getId(),
             user.getUsername(),
             user.getEmail(),
             user.getFirstName(),
             user.getLastName(),
-            user.getRoles().stream()
+            user.getRoles() != null ? user.getRoles().stream()
                 .map(role -> role.getName().name())
-                .collect(Collectors.toSet())
+                .collect(Collectors.toSet()) : Collections.emptySet()
         );
     }
 
     public boolean existsSuperAdmin() {
-        return userRepository.existsByRoles_Name(Role.RoleType.ROLE_SUPER_ADMIN);
+        return userRepository.existsByRoles_Name(RoleType.ROLE_SUPER_ADMIN);
     }
 
     private Role findRole(String roleName) {
-        Role.RoleType roleType;
-        try {
-            roleType = Role.RoleType.valueOf(roleName);
-        } catch (IllegalArgumentException e) {
-            throw new RuntimeException("Invalid role name: " + roleName);
-        }
+        RoleType roleType = RoleType.valueOf(roleName);
         return roleRepository.findByName(roleType)
                 .orElseThrow(() -> new RuntimeException("Role not found"));
     }
 
-    public boolean existsByRoleName(Role.RoleType roleType) {
+    public boolean existsByRoleName(RoleType roleType) {
         return roleRepository.existsByName(roleType);
     }
 
-    public boolean hasRole(User user, Role.RoleType roleType) {
+    public boolean hasRole(User user, RoleType roleType) {
         return user.getRoles().stream()
                 .anyMatch(role -> role.getName().equals(roleType));
     }
@@ -257,5 +274,43 @@ public class UserService implements UserDetailsService {
             logger.error("Error while registering super admin", e);
             return ResponseEntity.internalServerError().body("Error: " + e.getMessage());
         }
+    }
+
+    public List<String> getUserRoles(String username) {
+        User user = userRepository.findByUsername(username)
+                .orElseThrow(() -> new RuntimeException("User not found"));
+        return user.getRoles().stream()
+                .map(role -> role.getName().name())
+                .collect(Collectors.toList());
+    }
+
+    @Transactional
+    public void assignRoleToUser(Long userId, Long roleId) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new RuntimeException("User not found"));
+        Role role = roleRepository.findById(roleId)
+                .orElseThrow(() -> new RuntimeException("Role not found"));
+        
+        user.getRoles().add(role);
+        userRepository.save(user);
+    }
+
+    @Transactional
+    public void removeRoleFromUser(Long userId, Long roleId) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new RuntimeException("User not found"));
+        Role role = roleRepository.findById(roleId)
+                .orElseThrow(() -> new RuntimeException("Role not found"));
+        
+        user.getRoles().remove(role);
+        userRepository.save(user);
+    }
+
+    public List<String> getUserRolesByUsername(String username) {
+        User user = userRepository.findByUsername(username)
+            .orElseThrow(() -> new RuntimeException("User not found: " + username));
+        return user.getRoles().stream()
+            .map(role -> role.getName().name())
+            .collect(Collectors.toList());
     }
 } 

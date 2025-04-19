@@ -321,6 +321,39 @@ Tasks are queued in Redis and processed by Celery workers, ensuring:
 - ELK Stack for log management
 - Custom health check endpoints
 
+## Testing
+
+### Running Tests
+
+#### Authentication Service Tests
+```bash
+# Run all tests
+cd backend/authentication && ./mvnw test
+
+# Run specific test class
+cd backend/authentication && ./mvnw test -Dtest=UserRoleControllerIntegrationTest
+
+# Run tests with coverage
+cd backend/authentication && ./mvnw test jacoco:report
+```
+
+#### Analysis Service Tests
+```bash
+# Run all tests
+cd backend/analysis && python manage.py test
+
+# Run specific test module
+cd backend/analysis && python manage.py test analysis.tests.test_views
+
+# Run tests with coverage
+cd backend/analysis && coverage run manage.py test && coverage report
+```
+
+### Test Coverage
+- Authentication Service: Integration tests for user and role management
+- Analysis Service: Unit and integration tests for analysis endpoints
+- Frontend: Component and integration tests with React Testing Library
+
 ## Prerequisites
 
 ### Windows
@@ -866,144 +899,3 @@ curl http://localhost:8080/api/v1/users/check-username-availability?username=tes
 - Remote debugging is enabled on port 5005
 - Swagger UI is available at http://localhost:8080/swagger-ui.html
 - Spring Boot Actuator endpoints are available at http://localhost:8080/actuator
-
-├───aips
-│   ├───.cache
-│   ├───node_modules
-│   ├───public
-│   └───src
-│       ├───assets
-│       ├───components
-│       │   ├───common
-│       │   └───layout
-│       ├───pages
-│       ├───services
-│       ├───store
-│       │   └───slices
-│       └───theme
-├───backend
-│   ├───analysis
-│   │   ├───analysis
-│   │   │   └───__pycache__
-│   │   ├───data
-│   │   │   ├───datasets
-│   │   │   └───models
-│   │   ├───personality_analyzer
-│   │   │   └───__pycache__
-│   │   └───venv
-│   ├───authentication
-│   │   ├───.mvn
-│   │   │   └───wrapper
-│   │   ├───src
-│   │   │   ├───main
-│   │   │   │   ├───java
-│   │   │   │   │   └───com
-│   │   │   │   │       └───aips
-│   │   │   │   │           └───authentication
-│   │   │   │   │               ├───config
-│   │   │   │   │               ├───controller
-│   │   │   │   │               ├───dto
-│   │   │   │   │               ├───exception
-│   │   │   │   │               ├───model
-│   │   │   │   │               │   └───audit
-│   │   │   │   │               ├───repository
-│   │   │   │   │               ├───security
-│   │   │   │   │               └───service
-│   │   │   │   └───resources
-│   │   │   └───test
-│   │   │       └───java
-│   │   │           └───com
-│   │   │               └───aips
-│   │   │                   └───authentication
-│   │   │                       └───service
-│   │   └───target
-│   │       ├───classes
-│   │       │   └───com
-│   │       │       └───aips
-│   │       │           └───authentication
-│   │       │               ├───config
-│   │       │               ├───controller
-│   │       │               ├───dto
-│   │       │               ├───exception
-│   │       │               ├───model
-│   │       │               │   └───audit
-│   │       │               ├───repository
-│   │       │               ├───security
-│   │       │               └───service
-│   │       ├───generated-sources
-│   │       │   └───annotations
-│   │       ├───generated-test-sources
-│   │       │   └───test-annotations
-│   │       ├───maven-archiver
-│   │       ├───maven-status
-│   │       │   └───maven-compiler-plugin
-│   │       │       ├───compile
-│   │       │       │   └───default-compile
-│   │       │       └───testCompile
-│   │       │           └───default-testCompile
-│   │       └───test-classes
-│   │           └───com
-│   │               └───aips
-│   │                   └───authentication
-│   │                       └───service
-│   └───recommendation
-│       ├───app
-│       │   └───__pycache__
-│       ├───migrations
-│       │   ├───versions
-│       │   │   └───__pycache__
-│       │   └───__pycache__
-│       └───venv
-├───Data
-│   ├───elasticsearch
-│   ├───models
-│   ├───postgres
-│   │   ├───analysis
-│   │   ├───auth
-│   │   └───recommendation
-│   ├───processed
-│   ├───raw
-│   └───redis
-├───deployment
-│   ├───kubernetes
-│   └───nginx
-│       └───ssl
-├───monitoring
-│   ├───grafana
-│   │   └───provisioning
-│   │       ├───dashboards
-│   │       └───datasources
-│   ├───logstash
-│   │   ├───config
-│   │   └───pipeline
-│   └───prometheus
-│       └───rules
-└───scripts
-
-
-backend/
-├── src/main/java/com/aips/authentication/
-│   ├── controller/
-│   │   └── AuthController.java
-│   ├── dto/
-│   │   ├── SignInRequest.java
-│   │   ├── SignUpRequest.java
-│   │   └── JwtAuthenticationResponse.java
-│   ├── model/
-│   │   ├── User.java
-│   │   ├── Role.java
-│   │   └── RoleType.java
-│   ├── repository/
-│   │   ├── UserRepository.java
-│   │   └── RoleRepository.java
-│   ├── security/
-│   │   ├── JwtTokenProvider.java
-│   │   └── UserPrincipal.java
-│   ├── service/
-│   │   ├── AuthenticationService.java
-│   │   └── UserService.java
-│   └── AuthenticationApplication.java
-├── src/main/resources/
-│   └── application.yml
-├── Dockerfile
-└── pom.xml

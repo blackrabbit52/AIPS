@@ -13,6 +13,7 @@ import {
   DialogTitle,
   DialogContent,
   DialogActions,
+  DialogContentText,
   TextField,
   FormControl,
   InputLabel,
@@ -21,7 +22,8 @@ import {
   Chip,
   IconButton,
   Typography,
-  Alert
+  Alert,
+  Snackbar
 } from '@mui/material';
 import {
   Edit as EditIcon,
@@ -30,25 +32,31 @@ import {
 import authService from '../../services/auth.service';
 
 const ROLES = {
-  USER_ROLE: { label: 'User', color: 'default' },
-  ANALYST_ROLE: { label: 'Analyst', color: 'info' },
-  ADMIN_ROLE: { label: 'Admin', color: 'warning' },
-  SUPER_USER_ROLE: { label: 'Super User', color: 'error' }
+  ROLE_USER: { label: 'User', color: 'default' },
+  ROLE_ANALYST: { label: 'Analyst', color: 'info' },
+  ROLE_ADMIN: { label: 'Admin', color: 'warning' },
+  ROLE_SUPER_ADMIN: { label: 'Super Admin', color: 'error' }
 };
 
 const UserManagement = () => {
   const [users, setUsers] = useState([]);
-  const [openDialog, setOpenDialog] = useState(false);
+  const [openRoleDialog, setOpenRoleDialog] = useState(false);
+  const [openDeleteDialog, setOpenDeleteDialog] = useState(false);
   const [selectedUser, setSelectedUser] = useState(null);
+  const [newRole, setNewRole] = useState('');
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  const [loading, setLoading] = useState(false);
 
   const loadUsers = async () => {
+    setLoading(true);
     try {
       const response = await authService.getAllUsers();
       setUsers(response);
     } catch (err) {
       setError('Failed to load users');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -56,13 +64,51 @@ const UserManagement = () => {
     loadUsers();
   }, []);
 
-  const handleRoleChange = async (userId, newRole) => {
+  const handleOpenRoleDialog = (user) => {
+    setSelectedUser(user);
+    setNewRole(user.roles[0] || '');
+    setOpenRoleDialog(true);
+  };
+
+  const handleCloseRoleDialog = () => {
+    setOpenRoleDialog(false);
+    setSelectedUser(null);
+    setNewRole('');
+  };
+
+  const handleOpenDeleteDialog = (user) => {
+    setSelectedUser(user);
+    setOpenDeleteDialog(true);
+  };
+
+  const handleCloseDeleteDialog = () => {
+    setOpenDeleteDialog(false);
+    setSelectedUser(null);
+  };
+
+  const handleRoleChange = async () => {
+    if (!selectedUser || !newRole) return;
+
     try {
-      await authService.updateUserRole(userId, newRole);
+      await authService.updateUserRole(selectedUser.id, newRole);
       setSuccess('Role updated successfully');
       loadUsers();
+      handleCloseRoleDialog();
     } catch (err) {
       setError('Failed to update role');
+    }
+  };
+
+  const handleDeleteUser = async () => {
+    if (!selectedUser) return;
+
+    try {
+      await authService.deleteUser(selectedUser.id);
+      setSuccess('User deleted successfully');
+      loadUsers();
+      handleCloseDeleteDialog();
+    } catch (err) {
+      setError('Failed to delete user');
     }
   };
 
@@ -72,8 +118,16 @@ const UserManagement = () => {
         User Management
       </Typography>
 
-      {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
-      {success && <Alert severity="success" sx={{ mb: 2 }}>{success}</Alert>}
+      {error && (
+        <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError('')}>
+          {error}
+        </Alert>
+      )}
+      {success && (
+        <Alert severity="success" sx={{ mb: 2 }} onClose={() => setSuccess('')}>
+          {success}
+        </Alert>
+      )}
 
       <TableContainer component={Paper}>
         <Table>
@@ -101,27 +155,15 @@ const UserManagement = () => {
                   ))}
                 </TableCell>
                 <TableCell>
-                  <FormControl size="small" sx={{ minWidth: 120, mr: 1 }}>
-                    <Select
-                      value=""
-                      onChange={(e) => handleRoleChange(user.id, e.target.value)}
-                      displayEmpty
-                    >
-                      <MenuItem value="" disabled>Add Role</MenuItem>
-                      {Object.entries(ROLES).map(([role, { label }]) => (
-                        <MenuItem 
-                          key={role} 
-                          value={role}
-                          disabled={user.roles.includes(role)}
-                        >
-                          {label}
-                        </MenuItem>
-                      ))}
-                    </Select>
-                  </FormControl>
+                  <IconButton 
+                    color="primary"
+                    onClick={() => handleOpenRoleDialog(user)}
+                  >
+                    <EditIcon />
+                  </IconButton>
                   <IconButton 
                     color="error"
-                    onClick={() => {/* Implement delete user */}}
+                    onClick={() => handleOpenDeleteDialog(user)}
                   >
                     <DeleteIcon />
                   </IconButton>
@@ -131,6 +173,53 @@ const UserManagement = () => {
           </TableBody>
         </Table>
       </TableContainer>
+
+      {/* Role Update Dialog */}
+      <Dialog open={openRoleDialog} onClose={handleCloseRoleDialog}>
+        <DialogTitle>Update User Role</DialogTitle>
+        <DialogContent>
+          <DialogContentText>
+            Select a new role for user: {selectedUser?.username}
+          </DialogContentText>
+          <FormControl fullWidth sx={{ mt: 2 }}>
+            <InputLabel>Role</InputLabel>
+            <Select
+              value={newRole}
+              onChange={(e) => setNewRole(e.target.value)}
+              label="Role"
+            >
+              {Object.entries(ROLES).map(([role, { label }]) => (
+                <MenuItem key={role} value={role}>
+                  {label}
+                </MenuItem>
+              ))}
+            </Select>
+          </FormControl>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={handleCloseRoleDialog}>Cancel</Button>
+          <Button onClick={handleRoleChange} color="primary">
+            Update
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Delete Confirmation Dialog */}
+      <Dialog open={openDeleteDialog} onClose={handleCloseDeleteDialog}>
+        <DialogTitle>Delete User</DialogTitle>
+        <DialogContent>
+          <DialogContentText>
+            Are you sure you want to delete user: {selectedUser?.username}?
+            This action cannot be undone.
+          </DialogContentText>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={handleCloseDeleteDialog}>Cancel</Button>
+          <Button onClick={handleDeleteUser} color="error">
+            Delete
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   );
 };

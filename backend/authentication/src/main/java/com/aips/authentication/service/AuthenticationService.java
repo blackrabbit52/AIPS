@@ -121,12 +121,17 @@ public class AuthenticationService {
         user.setFirstName(request.getFirstName());
         user.setLastName(request.getLastName());
 
-        // Assigner le rôle USER
-        Role userRole = roleRepository.findByName(Role.RoleType.ROLE_USER)
-            .orElseThrow(() -> new RuntimeException("Default role not found"));
+        // Assign default role
+        Role defaultRole = roleRepository.findByName(RoleType.ROLE_USER)
+                .orElseGet(() -> {
+                    Role role = new Role();
+                    role.setName(RoleType.ROLE_USER);
+                    role.setDescription("Default user role");
+                    return roleRepository.save(role);
+                });
         
         Set<Role> roles = new HashSet<>();
-        roles.add(userRole);
+        roles.add(defaultRole);
         user.setRoles(roles);
 
         // Sauvegarder l'utilisateur
@@ -148,13 +153,40 @@ public class AuthenticationService {
         );
     }
 
-    private Role getRole(Role.RoleType roleType) {
-        return roleRepository.findByName(roleType)
-                .orElseThrow(() -> new RuntimeException("Role not found"));
+    @Transactional
+    public void assignRoleToUser(String username, RoleType roleType) {
+        User user = userRepository.findByUsername(username)
+                .orElseThrow(() -> new RuntimeException("User not found"));
+        
+        Role role = roleRepository.findByName(roleType)
+                .orElseGet(() -> {
+                    Role newRole = new Role();
+                    newRole.setName(roleType);
+                    newRole.setDescription(roleType.name() + " role");
+                    return roleRepository.save(newRole);
+                });
+
+        user.getRoles().add(role);
+        userRepository.save(user);
     }
 
-    private Set<String> getRoleNames(Set<Role> roles) {
-        return roles.stream()
+    @Transactional
+    public void removeRoleFromUser(String username, RoleType roleType) {
+        User user = userRepository.findByUsername(username)
+                .orElseThrow(() -> new RuntimeException("User not found"));
+        
+        Role role = roleRepository.findByName(roleType)
+                .orElseThrow(() -> new RuntimeException("Role not found"));
+
+        user.getRoles().remove(role);
+        userRepository.save(user);
+    }
+
+    public Set<String> getUserRoles(String username) {
+        User user = userRepository.findByUsername(username)
+                .orElseThrow(() -> new RuntimeException("User not found"));
+        
+        return user.getRoles().stream()
                 .map(role -> role.getName().name())
                 .collect(Collectors.toSet());
     }

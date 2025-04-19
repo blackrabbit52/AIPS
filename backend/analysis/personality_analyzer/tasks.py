@@ -33,6 +33,7 @@ import time
 import gc
 import math
 import json
+import resource
 
 # Initialize NLP components
 nltk.download('punkt')
@@ -177,35 +178,67 @@ class PersonalityAnalyzer:
         self._load_models()
 
     def _load_models(self):
+        """Load the latest trained models"""
         try:
-            # Check if models exist
-            mbti_model_path = os.path.join(settings.MODEL_DIR, 'mbti')
-            ocean_model_path = os.path.join(settings.MODEL_DIR, 'ocean')
+            # Get the latest trained models
+            mbti_model = TrainedModel.objects.filter(
+                model_type='MBTI',
+                is_active=True
+            ).order_by('-training_date').first()
             
-            # If models don't exist yet, log a message and set flag to False
-            if not os.path.exists(mbti_model_path) or not os.path.exists(ocean_model_path):
-                logger.warning("Models have not been trained yet. Please run the training task first.")
+            ocean_model = TrainedModel.objects.filter(
+                model_type='OCEAN',
+                is_active=True
+            ).order_by('-training_date').first()
+            
+            if not mbti_model or not ocean_model:
+                logger.warning("Models not found in database")
                 self.models_available = False
                 return
             
-            # Improved model loading with cache
-            if 'mbti' not in self.model_cache:
-                self.model_cache['mbti'] = {
-                    'model': AutoModelForSequenceClassification.from_pretrained(mbti_model_path),
-                    'tokenizer': AutoTokenizer.from_pretrained(mbti_model_path)
-                }
+            # Load MBTI model
+            if mbti_model and os.path.exists(mbti_model.local_path):
+                model_path = os.path.join(mbti_model.local_path, 'model')
+                tokenizer_path = os.path.join(mbti_model.local_path, 'tokenizer')
+                
+                logger.info(f"Loading MBTI model from {model_path}")
+                logger.info(f"Loading MBTI tokenizer from {tokenizer_path}")
+                
+                if os.path.exists(model_path) and os.path.exists(tokenizer_path):
+                    self.mbti_model = AutoModelForSequenceClassification.from_pretrained(model_path)
+                    self.mbti_tokenizer = AutoTokenizer.from_pretrained(tokenizer_path)
+                else:
+                    logger.error(f"MBTI model or tokenizer not found at {model_path} or {tokenizer_path}")
+                    self.models_available = False
+                    return
+            else:
+                logger.error(f"MBTI model directory not found at {mbti_model.local_path}")
+                self.models_available = False
+                return
             
-            if 'ocean' not in self.model_cache:
-                self.model_cache['ocean'] = {
-                    'model': AutoModelForSequenceClassification.from_pretrained(ocean_model_path),
-                    'tokenizer': AutoTokenizer.from_pretrained(ocean_model_path)
-                }
-
-            self.mbti_model = self.model_cache['mbti']['model']
-            self.ocean_model = self.model_cache['ocean']['model']
-            self.tokenizer = self.model_cache['mbti']['tokenizer']
-            self.models_available = True  # Set flag to true if models loaded successfully
+            # Load OCEAN model
+            if ocean_model and os.path.exists(ocean_model.local_path):
+                model_path = os.path.join(ocean_model.local_path, 'model')
+                tokenizer_path = os.path.join(ocean_model.local_path, 'tokenizer')
+                
+                logger.info(f"Loading OCEAN model from {model_path}")
+                logger.info(f"Loading OCEAN tokenizer from {tokenizer_path}")
+                
+                if os.path.exists(model_path) and os.path.exists(tokenizer_path):
+                    self.ocean_model = AutoModelForSequenceClassification.from_pretrained(model_path)
+                    self.ocean_tokenizer = AutoTokenizer.from_pretrained(tokenizer_path)
+                else:
+                    logger.error(f"OCEAN model or tokenizer not found at {model_path} or {tokenizer_path}")
+                    self.models_available = False
+                    return
+            else:
+                logger.error(f"OCEAN model directory not found at {ocean_model.local_path}")
+                self.models_available = False
+                return
+            
+            self.models_available = True
             logger.info("Models loaded successfully")
+            
         except Exception as e:
             logger.error(f"Error loading models: {str(e)}")
             self.models_available = False
@@ -1030,17 +1063,19 @@ def train_personality_model(dataset_ids: List[int], model_type: str, data_limit=
     try:
         logger.info(f"Starting training for {model_type} model with datasets {dataset_ids}")
         
-        # Libérer la mémoire avant de commencer
+        # Clear memory before starting
         gc.collect()
-        if torch.cuda.is_available():
-            torch.cuda.empty_cache()
-            logger.info("CUDA available - cleared GPU cache")
         
-        # Création du répertoire pour stocker le modèle
-        model_dir = os.path.join(settings.MODELS_DIR, model_type.lower())
+        # Set memory limits
+        soft, hard = resource.getrlimit(resource.RLIMIT_AS)
+        resource.setrlimit(resource.RLIMIT_AS, (soft, hard))
+        
+        # Create model directory
+        model_dir = os.path.join(settings.DATA_DIR, 'models', model_type.lower())
         os.makedirs(model_dir, exist_ok=True)
+        logger.info(f"Model directory: {model_dir}")
         
-        # Chargement des datasets avec optimisation de mémoire
+        # Load datasets with memory optimization
         all_data = []
         total_samples_loaded = 0
         
@@ -1052,7 +1087,7 @@ def train_personality_model(dataset_ids: List[int], model_type: str, data_limit=
                 dataset_path = dataset.local_path
                 file_paths = []
                 
-                # Trouver tous les fichiers CSV dans le chemin du dataset
+                # Find all CSV files in the dataset path
                 if os.path.isdir(dataset_path):
                     for root, dirs, files in os.walk(dataset_path):
                         for file in files:
@@ -1070,26 +1105,26 @@ def train_personality_model(dataset_ids: List[int], model_type: str, data_limit=
                     logger.info(f"Processing file: {file_name}")
                     
                     try:
-                        # Utiliser optimisation de mémoire pour la lecture CSV
-                        csv_chunk_size = 5000  # Ajuster en fonction de la taille du fichier et mémoire disponible
+                        # Use memory optimization for reading CSV
+                        csv_chunk_size = 5000  # Adjust based on file size and available memory
                         
-                        # Obtenir le nombre total de lignes sans charger tout le fichier
+                        # Get total lines without loading the entire file
                         with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
                             total_lines = sum(1 for _ in f)
                         
                         headers = pd.read_csv(file_path, nrows=0).columns
-                        total_chunks = math.ceil((total_lines - 1) / csv_chunk_size)  # -1 pour les en-têtes
+                        total_chunks = math.ceil((total_lines - 1) / csv_chunk_size)  # -1 for headers
                         
                         logger.info(f"File {file_name} has {total_lines} lines, processing in {total_chunks} chunks")
                         
-                        # Traiter fichier en chunks pour économiser mémoire
+                        # Process file in chunks to save memory
                         for chunk_i, df_chunk in enumerate(pd.read_csv(file_path, chunksize=csv_chunk_size, low_memory=True, 
                                                       on_bad_lines='warn')):
                             logger.info(f"Processing chunk {chunk_i+1}/{total_chunks} of {file_name}")
                             
-                            # Conversions spécifiques au type de modèle
+                            # Specific conversions for model type
                             if model_type == 'MBTI':
-                                # Vérifier si le fichier a le format attendu
+                                # Check if the file has the expected format
                                 if 'type' in df_chunk.columns and any(col in df_chunk.columns for col in ['posts', 'text', 'content']):
                                     text_col = next(col for col in df_chunk.columns if col in ['posts', 'text', 'content'])
                                     df_processed = pd.DataFrame({
@@ -1104,10 +1139,10 @@ def train_personality_model(dataset_ids: List[int], model_type: str, data_limit=
                                     logger.warning(f"MBTI file {file_name} doesn't have expected columns (type, and text/posts/content)")
                                 
                             elif model_type == 'OCEAN':
-                                # Détection automatique du format OCEAN
+                                # Automatic detection of OCEAN format
                                 ocean_dims = ['openness', 'conscientiousness', 'extraversion', 'agreeableness', 'neuroticism']
                                 
-                                # Détecter les variantes de noms de colonnes pour OCEAN
+                                # Detect column name variants for OCEAN
                                 column_variants = {
                                     'openness': ['openness', 'opn', 'o', 'open'],
                                     'conscientiousness': ['conscientiousness', 'csn', 'c', 'cons'],
@@ -1126,7 +1161,7 @@ def train_personality_model(dataset_ids: List[int], model_type: str, data_limit=
                                         if dim in column_mapping:
                                             break
                                 
-                                # Si nous avons trouvé toutes les colonnes OCEAN et une colonne texte
+                                # If we found all OCEAN columns and a text column
                                 text_cols = [col for col in df_chunk.columns if col.lower() in ['text', 'post', 'content', 'description']]
                                 
                                 if len(column_mapping) == 5 and text_cols:
@@ -1138,7 +1173,7 @@ def train_personality_model(dataset_ids: List[int], model_type: str, data_limit=
                                     all_data.append(df_processed)
                                     total_samples_loaded += len(df_processed)
                                     logger.info(f"Loaded {len(df_processed)} samples from chunk {chunk_i+1}/{total_chunks} of {file_name}")
-                                # Sinon, essayer de créer un texte synthétique à partir des colonnes disponibles
+                                # Otherwise, try to create synthetic text from available columns
                                 elif len(column_mapping) == 5:
                                     df_chunk['text'] = df_chunk.apply(
                                         lambda row: f"Person with personality scores: " + 
@@ -1156,17 +1191,17 @@ def train_personality_model(dataset_ids: List[int], model_type: str, data_limit=
                                 else:
                                     logger.warning(f"OCEAN file {file_name} is missing required columns. Found mappings: {column_mapping}")
                             
-                            # Vérifier si nous avons atteint la limite de données
+                            # Check if we reached data limit
                             if data_limit and force_limit and total_samples_loaded >= data_limit:
                                 logger.info(f"Reached data limit of {data_limit} samples. Stopping data loading.")
                                 break
                         
-                        # Vérifier à nouveau si la limite est atteinte pour sauter les fichiers restants
+                        # Check again if limit is reached to skip remaining files
                         if data_limit and force_limit and total_samples_loaded >= data_limit:
                             logger.info(f"Data limit reached. Skipping remaining files.")
                             break
                         
-                        # Nettoyage mémoire après chaque fichier
+                        # Clean memory after each file
                         gc.collect()
                         
                     except Exception as file_error:
@@ -1188,7 +1223,7 @@ def train_personality_model(dataset_ids: List[int], model_type: str, data_limit=
         
         logger.info(f"Total samples loaded: {total_samples_loaded}")
         
-        # Combiner les données et appliquer la limite si nécessaire
+        # Combine data and apply limit if necessary
         combined_df = pd.concat(all_data, ignore_index=True)
         logger.info(f"Combined dataset shape: {combined_df.shape}")
         
@@ -1197,10 +1232,10 @@ def train_personality_model(dataset_ids: List[int], model_type: str, data_limit=
             combined_df = combined_df.sample(data_limit, random_state=42).reset_index(drop=True)
             logger.info(f"Dataset size after applying limit: {len(combined_df)}")
         
-        # Prétraitement des textes avec économie de mémoire
+        # Preprocess texts with memory economy
         logger.info("Preprocessing text data...")
         
-        # Prétraiter par batch pour économiser la mémoire
+        # Preprocess in batches for memory economy
         batch_size = 1000
         num_batches = math.ceil(len(combined_df) / batch_size)
         processed_texts = []
@@ -1214,17 +1249,17 @@ def train_personality_model(dataset_ids: List[int], model_type: str, data_limit=
             batch_processed = [preprocess_text(text) for text in batch_texts]
             processed_texts.extend(batch_processed)
             
-            # Nettoyage après chaque batch
+            # Clean after each batch
             gc.collect()
         
         combined_df['processed_text'] = processed_texts
         logger.info("Text preprocessing completed")
         
-        # Training en fonction du type de modèle
+        # Train model based on model type
         logger.info(f"Starting {model_type} model training")
         
         if model_type == 'MBTI':
-            # Classification multi-classe pour MBTI
+            # Multi-class classification for MBTI
             X = combined_df['processed_text']
             y = combined_df['type']
             
@@ -1269,12 +1304,12 @@ def train_personality_model(dataset_ids: List[int], model_type: str, data_limit=
             })
             test_dataset = test_dataset.map(tokenize_function, batched=True)
             
-            # Définir des paramètres d'entraînement avec optimisation de mémoire
+            # Define training parameters with memory optimization
             training_args = TrainingArguments(
                 output_dir=os.path.join(model_dir, 'results'),
                 num_train_epochs=3,
-                per_device_train_batch_size=4,  # Réduction de la taille du batch
-                per_device_eval_batch_size=4,   # Réduction de la taille du batch
+                per_device_train_batch_size=4,  # Reduce batch size
+                per_device_eval_batch_size=4,   # Reduce batch size
                 warmup_steps=500,
                 weight_decay=0.01,
                 logging_dir=os.path.join(model_dir, 'logs'),
@@ -1283,8 +1318,8 @@ def train_personality_model(dataset_ids: List[int], model_type: str, data_limit=
                 eval_steps=100,
                 save_steps=200,
                 load_best_model_at_end=True,
-                fp16=torch.cuda.is_available(),  # Utilisation de la précision mixte si GPU disponible
-                gradient_accumulation_steps=4    # Accumuler les gradients pour simuler des batch plus larges
+                fp16=torch.cuda.is_available(),  # Use mixed precision if GPU available
+                gradient_accumulation_steps=4    # Accumulate gradients for simulating larger batches
             )
             
             # Initialize trainer
@@ -1300,8 +1335,11 @@ def train_personality_model(dataset_ids: List[int], model_type: str, data_limit=
             trainer.train()
             
             # Save model and tokenizer
-            trainer.save_model(os.path.join(model_dir, 'model'))
-            tokenizer.save_pretrained(os.path.join(model_dir, 'tokenizer'))
+            model_save_path = os.path.join(model_dir, 'model')
+            tokenizer_save_path = os.path.join(model_dir, 'tokenizer')
+            
+            trainer.save_model(model_save_path)
+            tokenizer.save_pretrained(tokenizer_save_path)
             
             # Evaluate on test set
             logger.info("Evaluating MBTI model")
@@ -1315,29 +1353,29 @@ def train_personality_model(dataset_ids: List[int], model_type: str, data_limit=
             # Log evaluation results
             logger.info(f"MBTI model evaluation: {result}")
             
-            # Enregistrer le modèle dans la base de données
+            # Register model in database
             metrics = {
                 'accuracy': result.get('eval_accuracy'),
                 'loss': result.get('eval_loss')
             }
             
-            # Libérer la mémoire
+            # Clean memory
             del trainer, model, tokenizer
             gc.collect()
             if torch.cuda.is_available():
                 torch.cuda.empty_cache()
             
         elif model_type == 'OCEAN':
-            # Préparation pour régression multi-label
+            # Preparation for multi-label regression
             X = combined_df['processed_text']
             y = combined_df[['openness', 'conscientiousness', 'extraversion', 'agreeableness', 'neuroticism']]
             
-            # Division train/test
+            # Split train/test
             X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
             
             logger.info(f"Training set: {len(X_train)} samples, Test set: {len(X_test)} samples")
             
-            # Initialiser le tokenizer et le modèle
+            # Initialize tokenizer and model
             tokenizer = AutoTokenizer.from_pretrained('distilbert-base-uncased')
             model = AutoModelForSequenceClassification.from_pretrained(
                 'distilbert-base-uncased', 
@@ -1345,7 +1383,7 @@ def train_personality_model(dataset_ids: List[int], model_type: str, data_limit=
                 problem_type="regression"
             )
             
-            # Préparation des données pour l'entraînement
+            # Prepare data for training
             from transformers import TrainingArguments, Trainer
             from datasets import Dataset as HFDataset
             
@@ -1364,12 +1402,12 @@ def train_personality_model(dataset_ids: List[int], model_type: str, data_limit=
             })
             test_dataset = test_dataset.map(tokenize_function, batched=True)
             
-            # Définir des paramètres d'entraînement
+            # Define training parameters
             training_args = TrainingArguments(
                 output_dir=os.path.join(model_dir, 'results'),
                 num_train_epochs=3,
-                per_device_train_batch_size=4,  # Réduction de la taille du batch
-                per_device_eval_batch_size=4,   # Réduction de la taille du batch
+                per_device_train_batch_size=4,  # Reduce batch size
+                per_device_eval_batch_size=4,   # Reduce batch size
                 warmup_steps=500,
                 weight_decay=0.01,
                 logging_dir=os.path.join(model_dir, 'logs'),
@@ -1378,8 +1416,8 @@ def train_personality_model(dataset_ids: List[int], model_type: str, data_limit=
                 eval_steps=100,
                 save_steps=200,
                 load_best_model_at_end=True,
-                fp16=torch.cuda.is_available(),  # Utilisation de la précision mixte si GPU disponible
-                gradient_accumulation_steps=4    # Accumuler les gradients pour simuler des batch plus larges
+                fp16=torch.cuda.is_available(),  # Use mixed precision if GPU available
+                gradient_accumulation_steps=4    # Accumulate gradients for simulating larger batches
             )
             
             # Initialize trainer
@@ -1395,8 +1433,11 @@ def train_personality_model(dataset_ids: List[int], model_type: str, data_limit=
             trainer.train()
             
             # Save model and tokenizer
-            trainer.save_model(os.path.join(model_dir, 'model'))
-            tokenizer.save_pretrained(os.path.join(model_dir, 'tokenizer'))
+            model_save_path = os.path.join(model_dir, 'model')
+            tokenizer_save_path = os.path.join(model_dir, 'tokenizer')
+            
+            trainer.save_model(model_save_path)
+            tokenizer.save_pretrained(tokenizer_save_path)
             
             # Evaluate on test set
             logger.info("Evaluating OCEAN model")
@@ -1408,23 +1449,23 @@ def train_personality_model(dataset_ids: List[int], model_type: str, data_limit=
             # Metrics for regression model
             metrics = {
                 'eval_loss': result.get('eval_loss'),
-                'mse': None  # À calculer séparément
+                'mse': None  # To be calculated separately
             }
             
-            # Libérer la mémoire après l'entraînement
+            # Clean memory after training
             del trainer, model, tokenizer
             gc.collect()
             if torch.cuda.is_available():
                 torch.cuda.empty_cache()
         
-        # Générer un numéro de version
+        # Generate a version number
         version = datetime.now().strftime("%Y%m%d%H%M")
         
-        # Enregistrer le modèle dans la base de données
+        # Register model in database
         model_obj = TrainedModel.objects.create(
             name=f"{model_type}_model_{version}",
             model_type=model_type,
-            path=model_dir,
+            local_path=model_dir,  # Use full directory path
             metrics=metrics,
             version=version,
             parameters={
@@ -1434,12 +1475,15 @@ def train_personality_model(dataset_ids: List[int], model_type: str, data_limit=
             }
         )
         
-        # Désactiver tous les anciens modèles et activer le nouveau
+        # Deactivate all old models and activate the new one
         TrainedModel.objects.filter(model_type=model_type, is_active=True).update(is_active=False)
         model_obj.is_active = True
         model_obj.save()
         
         logger.info(f"{model_type} model trained successfully with {len(combined_df)} samples")
+        
+        # Clean memory after each model training
+        gc.collect()
         
         return {
             'status': 'success',
@@ -1495,7 +1539,7 @@ def preprocess_text(text):
         logger.error(f"Error in text preprocessing: {str(e)}")
         return ""
 
-# Nouvelles fonctions utilitaires
+# New utility functions
 def exponential_backoff(retries):
     """Calculate exponential backoff time."""
     return 2 ** retries * 60  # Minutes
@@ -1527,278 +1571,127 @@ class timeout:
     def _handle_timeout(self, *args):
         raise TimeoutError("Operation timed out")
 
-@shared_task
-def fetch_and_train_models(
-    model_types=['MBTI', 'OCEAN'], 
-    data_limit=None,
-    allow_alternative_formats=True,
-    force_limit=True,
-    convert_ocean_format=True,
-    check_existing_files=True,
-    ocean_filename='IPIP-FFM-data-8Nov2018'
-) -> Dict:
+@shared_task(bind=True)
+def fetch_and_train_models(self, model_types=None, data_limit=None, force_limit=False, allow_alternative_formats=True, convert_ocean_format=True, check_existing_files=True, ocean_filename="IPIP-FFM-data-8Nov2018", show_total_count=False):
     """
-    Combined task to fetch datasets and train models in one operation
+    Fetch and train models for personality analysis.
     
     Args:
-        model_types: List of model types to train (default: ['MBTI', 'OCEAN'])
-        data_limit: Maximum number of samples to use for training
-        allow_alternative_formats: Whether to accept non-CSV formats for datasets
-        force_limit: Whether to strictly enforce the data limit
-        convert_ocean_format: Whether to convert non-standard OCEAN data format
-        check_existing_files: Whether to check if files already exist before downloading
-        ocean_filename: Explicit filename for OCEAN dataset if not standard CSV
-    
-    Returns:
-        Dictionary with task results
+        model_types (list): List of model types to train ('MBTI', 'OCEAN')
+        data_limit (int): Maximum number of samples to use for training
+        force_limit (bool): Whether to force the data limit
+        allow_alternative_formats (bool): Whether to allow alternative data formats
+        convert_ocean_format (bool): Whether to convert OCEAN format
+        check_existing_files (bool): Whether to check for existing files
+        ocean_filename (str): Name of the OCEAN dataset file
+        show_total_count (bool): Whether to show total count of samples
     """
     try:
-        # Step 1: Fetch datasets (only if needed)
-        logger.info("Starting fetch and train process")
-        if data_limit:
-            logger.info(f"Training will be strictly limited to {data_limit} samples per model")
-        else:
-            logger.info("Training will use all available data (more accurate but slower)")
+        # Set memory limits
+        soft, hard = resource.getrlimit(resource.RLIMIT_AS)
+        # Set to 4GB
+        resource.setrlimit(resource.RLIMIT_AS, (4 * 1024 * 1024 * 1024, hard))
         
-        # Check if we need to download datasets or if they already exist
-        datasets_exist = False
-        if check_existing_files:
-            # Check if datasets already exist for requested model types
-            mbti_datasets = Dataset.objects.filter(type='MBTI')
-            ocean_datasets = Dataset.objects.filter(type='OCEAN')
-            
-            mbti_exists = mbti_datasets.exists() and 'MBTI' in model_types
-            ocean_exists = ocean_datasets.exists() and 'OCEAN' in model_types
-            
-            # Only proceed with download if any requested dataset doesn't exist
-            if (mbti_exists or 'MBTI' not in model_types) and (ocean_exists or 'OCEAN' not in model_types):
-                logger.info("All requested datasets already exist - skipping download")
-                datasets_exist = True
-                # Create result dictionary similar to what fetch_kaggle_datasets would return
-                kaggle_result = {
-                    'status': 'completed',
-                    'message': 'Using existing datasets - download skipped',
-                    'results': []
-                }
-        
-        if not datasets_exist:
-            logger.info("Step 1: Fetching datasets from Kaggle")
-            # Modify fetch_kaggle_datasets to include our additional parameters
-            # For now, we'll call it as is and handle OCEAN format issues later
-            kaggle_result = fetch_kaggle_datasets()
-        
-        if kaggle_result['status'] != 'completed':
-            logger.error(f"Dataset download failed: {kaggle_result.get('message', 'Unknown error')}")
-            return {
-                'status': 'error',
-                'message': f"Dataset download failed: {kaggle_result.get('message', 'Unknown error')}",
-                'step': 'dataset_download'
-            }
-        
-        # Handle OCEAN dataset format issues
-        if 'OCEAN' in model_types and convert_ocean_format:
-            try:
-                ocean_datasets = Dataset.objects.filter(type='OCEAN')
-                if ocean_datasets.exists():
-                    for ocean_dataset in ocean_datasets:
-                        dataset_path = ocean_dataset.local_path
-                        # Check for the specified OCEAN filename (with or without extension)
-                        potential_file = os.path.join(dataset_path, ocean_filename)
-                        potential_file_with_ext = os.path.join(dataset_path, f"{ocean_filename}.csv")
-                        
-                        # Si c'est un répertoire et non un fichier
-                        if os.path.isdir(potential_file):
-                            logger.info(f"{ocean_filename} est un répertoire, recherche de fichiers CSV à l'intérieur")
-                            
-                            # Rechercher des fichiers CSV dans le répertoire
-                            csv_files = []
-                            for root, dirs, files in os.walk(potential_file):
-                                for file in files:
-                                    if file.endswith('.csv'):
-                                        csv_files.append(os.path.join(root, file))
-                            
-                            if csv_files:
-                                logger.info(f"Trouvé {len(csv_files)} fichiers CSV dans le répertoire {ocean_filename}")
-                                # Utiliser le premier fichier CSV
-                                csv_path = csv_files[0]
-                                # Créer un lien vers le répertoire des datasets pour faciliter l'accès
-                                linked_csv = os.path.join(dataset_path, 'ocean_data.csv')
-                                
-                                try:
-                                    # Copier le fichier plutôt que de créer un lien symbolique
-                                    import shutil
-                                    shutil.copy2(csv_path, linked_csv)
-                                    
-                                    logger.info(f"Fichier CSV copié vers {linked_csv}")
-                                    
-                                    # Mise à jour du chemin dans la base de données
-                                    ocean_dataset.metadata = {
-                                        **ocean_dataset.metadata,
-                                        'files': [*ocean_dataset.metadata.get('files', []), 'ocean_data.csv']
-                                    }
-                                    ocean_dataset.save()
-                                except Exception as copy_error:
-                                    logger.error(f"Erreur lors de la copie du fichier CSV: {str(copy_error)}")
-                            else:
-                                logger.error(f"Aucun fichier CSV trouvé dans le répertoire {potential_file}")
-                        
-                        elif os.path.exists(potential_file) and os.path.isfile(potential_file):
-                            logger.info(f"Found non-standard OCEAN file: {ocean_filename}")
-                            # Convertir ce fichier en CSV si nécessaire
-                            try:
-                                # Détecter le type de fichier
-                                if potential_file.endswith('.csv'):
-                                    # C'est déjà un CSV
-                                    df = pd.read_csv(potential_file, on_bad_lines='warn')
-                                    logger.info(f"Successfully read {ocean_filename} as CSV")
-                                elif '\t' in open(potential_file, 'r', encoding='utf-8', errors='ignore').read(1024):
-                                    # C'est probablement un TSV
-                                    df = pd.read_csv(potential_file, delimiter='\t', on_bad_lines='warn')
-                                    logger.info(f"Successfully read {ocean_filename} as TSV")
-                                else:
-                                    # Essayer comme fixed width format
-                                    df = pd.read_fwf(potential_file, on_bad_lines='warn')
-                                    logger.info(f"Successfully read {ocean_filename} as fixed-width format")
-                                
-                                # Enregistrer en format CSV
-                                csv_path = os.path.join(dataset_path, 'converted_ocean.csv')
-                                df.to_csv(csv_path, index=False)
-                                logger.info(f"Converted OCEAN file to CSV at {csv_path}")
-                                
-                                # Mise à jour du chemin dans la base de données
-                                ocean_dataset.metadata = {
-                                    **ocean_dataset.metadata,
-                                    'files': [*ocean_dataset.metadata.get('files', []), 'converted_ocean.csv']
-                                }
-                                ocean_dataset.save()
-                            except Exception as conv_error:
-                                logger.error(f"Failed to convert OCEAN file: {str(conv_error)}")
-                        
-                        elif os.path.exists(potential_file_with_ext):
-                            logger.info(f"Found OCEAN file with extension: {ocean_filename}.csv")
-                            # Mettre à jour les métadonnées
-                            ocean_dataset.metadata = {
-                                **ocean_dataset.metadata,
-                                'files': [*ocean_dataset.metadata.get('files', []), f"{ocean_filename}.csv"]
-                            }
-                            ocean_dataset.save()
-                        
-                        else:
-                            # Rechercher d'autres formats potentiels
-                            for ext in ['.txt', '.tab', '.data', '.xlsx', '.xls']:
-                                alt_file = os.path.join(dataset_path, f"{ocean_filename}{ext}")
-                                if os.path.exists(alt_file):
-                                    logger.info(f"Found alternative OCEAN file: {ocean_filename}{ext}")
-                                    try:
-                                        if ext in ['.xlsx', '.xls']:
-                                            df = pd.read_excel(alt_file)
-                                        elif ext == '.txt' or ext == '.tab':
-                                            df = pd.read_csv(alt_file, delimiter='\t', on_bad_lines='warn')
-                                        elif ext == '.data':
-                                            df = pd.read_csv(alt_file, delimiter=',', on_bad_lines='warn')
-                                        
-                                        csv_path = os.path.join(dataset_path, 'converted_ocean.csv')
-                                        df.to_csv(csv_path, index=False)
-                                        logger.info(f"Converted OCEAN file to CSV at {csv_path}")
-                                        
-                                        # Mise à jour du chemin dans la base de données
-                                        ocean_dataset.metadata = {
-                                            **ocean_dataset.metadata,
-                                            'files': [*ocean_dataset.metadata.get('files', []), 'converted_ocean.csv']
-                                        }
-                                        ocean_dataset.save()
-                                        break
-                                    except Exception as alt_error:
-                                        logger.error(f"Failed to convert alternative OCEAN file: {str(alt_error)}")
-            
-            except Exception as e:
-                logger.error(f"Error handling OCEAN format: {str(e)}")
-        
-        # Get dataset IDs by type
-        dataset_ids_by_type = {}
-        for model_type in model_types:
-            datasets = Dataset.objects.filter(type=model_type)
-            dataset_ids_by_type[model_type] = list(datasets.values_list('id', flat=True))
-        
-        # Step 2: Train models
-        logger.info("Step 2: Training models")
+        logger.info("Starting fetch and train with parameters:")
+        logger.info(f"Model types: {model_types}")
+        logger.info(f"Data limit: {data_limit}")
+        logger.info(f"Force limit: {force_limit}")
+        logger.info(f"Allow alternative formats: {allow_alternative_formats}")
+        logger.info(f"Convert OCEAN format: {convert_ocean_format}")
+        logger.info(f"Check existing files: {check_existing_files}")
+        logger.info(f"OCEAN filename: {ocean_filename}")
+        logger.info(f"Show total count: {show_total_count}")
+        logger.info(f"Memory limit set to: {soft / (1024*1024*1024)}GB")
+
+        if model_types is None:
+            model_types = ['MBTI', 'OCEAN']
+
         results = {}
-        total_progress = 0
-        progress_per_model = 100 / len(model_types) if model_types else 100
-        
         for model_type in model_types:
-            if not dataset_ids_by_type.get(model_type):
-                logger.warning(f"No datasets found for {model_type}, skipping training")
-                results[model_type] = {
-                    'status': 'skipped',
-                    'message': f"No datasets found for {model_type}"
-                }
-                continue
-                
-            logger.info(f"Training {model_type} model with {len(dataset_ids_by_type[model_type])} datasets")
-            
             try:
-                # Pass data_limit parameter to train_personality_model
-                # Also pass force_limit parameter to ensure limit is respected
-                training_result = train_personality_model(
-                    dataset_ids_by_type[model_type],
-                    model_type,
-                    data_limit,
+                logger.info(f"Starting process for {model_type} model")
+                
+                # Create a new model instance
+                model = TrainedModel.objects.create(
+                    name=f"{model_type}_model",
+                    model_type=model_type,
+                    version="1.0",
+                    status="training"
+                )
+                logger.info(f"Created model record with ID: {model.id}")
+
+                # Fetch and process dataset
+                logger.info(f"Fetching dataset for {model_type}")
+                dataset_result = fetch_kaggle_datasets()
+                
+                if not dataset_result or dataset_result.get('status') != 'completed':
+                    raise Exception(f"Failed to fetch datasets: {dataset_result.get('message', 'Unknown error')}")
+                
+                # Find the correct dataset path for this model type
+                dataset_path = None
+                for result in dataset_result.get('results', []):
+                    if result.get('type') == model_type:
+                        dataset = Dataset.objects.get(id=result['dataset_id'])
+                        dataset_path = dataset.local_path
+                        break
+                
+                if not dataset_path:
+                    raise Exception(f"No dataset found for {model_type}")
+
+                logger.info(f"Dataset fetched successfully: {dataset_path}")
+
+                # Train the model with the correct parameters
+                logger.info(f"Starting model training for {model_type}")
+                trained_model = train_personality_model(
+                    dataset_ids=[dataset.id],
+                    model_type=model_type,
+                    data_limit=data_limit,
                     force_limit=force_limit
                 )
-                results[model_type] = training_result
-                
-                if training_result['status'] != 'success':
-                    logger.error(f"Training {model_type} model failed: {training_result.get('message', 'Unknown error')}")
-                
+
+                if trained_model and trained_model.get('status') == 'success':
+                    logger.info(f"Model training completed successfully for {model_type}")
+                    # Update model with training results
+                    model.local_path = trained_model['model_name']
+                    model.metrics = trained_model['metrics']
+                    model.parameters = {
+                        'data_limit': data_limit,
+                        'samples_used': trained_model['samples_used']
+                    }
+                    model.status = "completed"
+                    model.save()
+                    
+                    # Mark as active
+                    model.mark_as_active()
+                    logger.info(f"Model {model.id} marked as active")
+                    
+                    results[model_type] = {
+                        'status': 'success',
+                        'model_id': model.id,
+                        'metrics': trained_model['metrics']
+                    }
+                else:
+                    error_msg = trained_model.get('message', 'Unknown error') if trained_model else 'No response from training'
+                    logger.error(f"Training failed for {model_type}: {error_msg}")
+                    raise Exception(f"Failed to train model for {model_type}: {error_msg}")
+
             except Exception as e:
-                logger.error(f"Error training {model_type} model: {str(e)}")
+                logger.error(f"Error processing {model_type}: {str(e)}")
+                if model:
+                    model.status = "failed"
+                    model.error_message = str(e)
+                    model.save()
                 results[model_type] = {
                     'status': 'error',
-                    'message': str(e)
+                    'error': str(e)
                 }
-            
-            # Update progress for this model
-            total_progress += progress_per_model
-        
-        # Step 3: Reload models for the analyzer
-        try:
-            logger.info("Step 3: Reloading models in analyzer")
-            analyzer._load_models()
-        except Exception as e:
-            logger.error(f"Error reloading models: {str(e)}")
-        
-        # Results summary
-        success_models = [model_type for model_type, result in results.items() 
-                          if result.get('status') == 'success']
-        failed_models = [model_type for model_type, result in results.items() 
-                         if result.get('status') == 'error']
-        skipped_models = [model_type for model_type, result in results.items() 
-                          if result.get('status') == 'skipped']
-        
-        # Log results
-        if success_models:
-            logger.info(f"✅ MODELS TRAINED SUCCESSFULLY: {', '.join(success_models)}")
-        if failed_models:
-            logger.warning(f"❌ MODELS FAILED TRAINING: {', '.join(failed_models)}")
-        if skipped_models:
-            logger.info(f"⏭️ MODELS SKIPPED: {', '.join(skipped_models)}")
-        
-        # Final log
-        overall_status = "COMPLETED SUCCESSFULLY" if not failed_models else "COMPLETED WITH ERRORS"
-        logger.info(f"=========== FETCH AND TRAIN PROCESS {overall_status} ===========")
-        
-        return {
-            'status': 'completed',
-            'dataset_download': kaggle_result,
-            'model_training': results,
-            'data_limit_applied': data_limit,
-            'progress': 100
-        }
-        
+            finally:
+                # Clean up memory
+                gc.collect()
+                logger.info(f"Memory cleanup completed for {model_type}")
+
+        return results
+
     except Exception as e:
-        logger.error(f"Error in fetch and train process: {str(e)}")
-        return {
-            'status': 'error',
-            'message': str(e)
-        } 
+        logger.error(f"Error in fetch_and_train_models: {str(e)}")
+        raise 

@@ -13,6 +13,11 @@ services:
     volumes:
       - ./data/datasets:/app/data/datasets
       - ./data/models:/app/data/models
+    environment:
+      - KAGGLE_USERNAME=${KAGGLE_USERNAME}
+      - KAGGLE_KEY=${KAGGLE_KEY}
+    command: >
+      bash -c "mkdir -p /root/.kaggle && echo '{\"username\":\"${KAGGLE_USERNAME}\",\"key\":\"${KAGGLE_KEY}\"}' > /root/.kaggle/kaggle.json && chmod 600 /root/.kaggle/kaggle.json && python manage.py runserver 0.0.0.0:8000"
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/api/health/"]
       interval: 30s
@@ -58,21 +63,42 @@ services:
       context: .
       dockerfile: Dockerfile
     container_name: aips_analysis_celery
-    command: celery -A analysis worker -l info
+    working_dir: /app
+    command: >
+      bash -c "mkdir -p /root/.kaggle && echo '{\"username\":\"${KAGGLE_USERNAME}\",\"key\":\"${KAGGLE_KEY}\"}' > /root/.kaggle/kaggle.json && chmod 600 /root/.kaggle/kaggle.json && bash /app/entrypoint-celery.sh"
     env_file:
       - .env
     volumes:
-      - ./data/datasets:/app/data/datasets
-      - ./data/models:/app/data/models
-      - ./entrypoint-celery.sh:/entrypoint-celery.sh
-    entrypoint: ["/entrypoint-celery.sh"]
+      - .:/app
+      - ./data:/app/data
+      - ./analysis:/app/analysis
+    tmpfs:
+      - /tmp:size=1G
     depends_on:
       - redis
       - analysis_db
+    environment:
+      - DB_NAME=${DB_NAME}
+      - DB_USER=${DB_USER}
+      - DB_PASSWORD=${DB_PASSWORD}
+      - DB_HOST=analysis-db
+      - DB_PORT=5432
+      - REDIS_URL=redis://redis:6379/0
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis:6379/0
+      - DEBUG=True
+      - KAGGLE_USERNAME=${KAGGLE_USERNAME}
+      - KAGGLE_KEY=${KAGGLE_KEY}
+    deploy:
+      resources:
+        limits:
+          memory: 4G
+        reservations:
+          memory: 2G
 
 volumes:
   postgres_data:
 
 networks:
-  default:
-    name: aips_analysis_network 
+  aips_analysis_network:
+    driver: bridge 

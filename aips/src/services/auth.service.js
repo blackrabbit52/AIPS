@@ -1,41 +1,50 @@
 import axios from 'axios';
 
 // Base API URL configuration
-const API_URL = "http://localhost:8080/api/v1";
+const API_URL = process.env.REACT_APP_API_URL || "http://localhost:8080/api/v1";
 
 // Global Axios configuration for CORS and headers
 axios.defaults.headers.common['Content-Type'] = 'application/json';
 axios.defaults.headers.common['Accept'] = 'application/json';
-axios.defaults.withCredentials = true; // Required for CORS
+axios.defaults.withCredentials = true;
+
+// Cache storage
+let usersCache = null;
+let rolesCache = null;
+let lastUsersFetch = 0;
+let lastRolesFetch = 0;
+const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
 
 class AuthService {
+    constructor() {
+        this.setupAxiosInterceptors();
+    }
+
+    setupAxiosInterceptors() {
+        const token = localStorage.getItem('token');
+        if (token) {
+            axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
+        } else {
+            delete axios.defaults.headers.common['Authorization'];
+        }
+    }
+
     async login(usernameOrEmail, password) {
-        console.log('Login attempt:', { usernameOrEmail, password });
         try {
             const response = await axios.post(`${API_URL}/auth/signin`, {
                 usernameOrEmail,
                 password
-            }, {
-                withCredentials: true,
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Accept': 'application/json'
-                }
             });
-            console.log('Server response:', response.data);
+            
             if (response.data.token) {
-                // Store token separately
                 localStorage.setItem('token', response.data.token);
-                // Store user data
                 localStorage.setItem('user', JSON.stringify(response.data));
-                // Set axios default header
-                axios.defaults.headers.common['Authorization'] = `Bearer ${response.data.token}`;
-                // Trigger authentication state change
+                this.setupAxiosInterceptors();
                 window.dispatchEvent(new Event('auth-change'));
             }
             return response.data;
         } catch (error) {
-            console.error('Authentication error:', error);
+            console.error('Login error:', error);
             throw this.handleError(error);
         }
     }
@@ -43,12 +52,15 @@ class AuthService {
     logout() {
         localStorage.removeItem('token');
         localStorage.removeItem('user');
-        delete axios.defaults.headers.common['Authorization'];
+        usersCache = null;
+        rolesCache = null;
+        lastUsersFetch = 0;
+        lastRolesFetch = 0;
+        this.setupAxiosInterceptors();
         window.dispatchEvent(new Event('auth-change'));
     }
 
     async register(formData) {
-        console.log('Registration attempt:', formData);
         try {
             const response = await axios.post(`${API_URL}/auth/signup`, {
                 username: formData.username,
@@ -56,16 +68,9 @@ class AuthService {
                 password: formData.password,
                 firstName: formData.firstName,
                 lastName: formData.lastName
-            }, {
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Accept': 'application/json'
-                }
             });
-            console.log('Server response:', response.data);
             return response.data;
         } catch (error) {
-            console.error('Detailed error:', error);
             throw this.handleError(error);
         }
     }
@@ -73,99 +78,185 @@ class AuthService {
     getCurrentUser() {
         try {
             const userStr = localStorage.getItem('user');
-            const user = userStr ? JSON.parse(userStr) : null;
-            
-            // Ajouter des logs pour le débogage
-            console.log('Current user:', user);
-            
-            return user;
+            return userStr ? JSON.parse(userStr) : null;
         } catch (error) {
-            console.error('Error getting current user:', error);
+            console.error('Error parsing user data:', error);
             return null;
         }
     }
 
     isAuthenticated() {
+        const token = localStorage.getItem('token');
         const user = this.getCurrentUser();
-        const token = user?.token || localStorage.getItem('token');
-        const isValid = !!token;
-        
-        // Debug logs
-        console.log('Auth check:', {
-            hasToken: !!token,
-            hasUser: !!user,
-            isValid
-        });
-        
-        return isValid;
+        return !!(token && user);
     }
 
     hasRole(role) {
         const user = this.getCurrentUser();
-        return user?.roles?.includes(role) || false;
+        if (!user || !user.roles) return false;
+        
+        const normalizedRole = role.toUpperCase();
+        return user.roles.some(userRole => 
+            userRole.toUpperCase() === normalizedRole || 
+            userRole.toUpperCase() === 'ROLE_SUPER_ADMIN'
+        );
     }
 
     hasPermission(permission) {
         const user = this.getCurrentUser();
-        return user?.authorities?.some(auth => auth.authority === permission) || false;
+        return user?.permissions?.includes(permission) || false;
     }
 
-    setupAxiosInterceptors() {
-        const token = localStorage.getItem('token');
-        if (token) {
-            axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
+    // User Management
+    async getAllUsers() {
+        const now = Date.now();
+        if (usersCache && (now - lastUsersFetch) < CACHE_DURATION) {
+            return usersCache;
+        }
+        
+        try {
+            const response = await axios.get(`${API_URL}/users`);
+            usersCache = response.data;
+            lastUsersFetch = now;
+            return response.data;
+        } catch (error) {
+            throw this.handleError(error);
         }
     }
 
-    // Nouvelles méthodes pour le backoffice
-    async getAllUsers() {
-        return axios.get(`${API_URL}/users`).then(response => response.data);
+    async getUserById(id) {
+        try {
+            const response = await axios.get(`${API_URL}/users/${id}`);
+            return response.data;
+        } catch (error) {
+            throw this.handleError(error);
+        }
     }
 
-    async getUserById(id) {
-        return axios.get(`${API_URL}/users/${id}`).then(response => response.data);
+    async createUser(userData) {
+        try {
+            const response = await axios.post(`${API_URL}/users`, userData);
+            usersCache = null; // Invalidate users cache
+            return response.data;
+        } catch (error) {
+            throw this.handleError(error);
+        }
     }
 
     async updateUser(id, userData) {
-        return axios.put(`${API_URL}/users/${id}`, userData).then(response => response.data);
+        try {
+            const response = await axios.put(`${API_URL}/users/${id}`, userData);
+            usersCache = null; // Invalidate users cache
+            return response.data;
+        } catch (error) {
+            throw this.handleError(error);
+        }
     }
 
     async deleteUser(id) {
-        return axios.delete(`${API_URL}/users/${id}`);
+        try {
+            await axios.delete(`${API_URL}/users/${id}`);
+            usersCache = null; // Invalidate users cache
+        } catch (error) {
+            throw this.handleError(error);
+        }
     }
 
+    // Role Management
     async getAllRoles() {
-        return axios.get(`${API_URL}/roles`).then(response => response.data);
+        const now = Date.now();
+        if (rolesCache && (now - lastRolesFetch) < CACHE_DURATION) {
+            return rolesCache;
+        }
+        
+        try {
+            const response = await axios.get(`${API_URL}/roles`);
+            rolesCache = response.data;
+            lastRolesFetch = now;
+            return response.data;
+        } catch (error) {
+            throw this.handleError(error);
+        }
     }
 
     async getRoleById(id) {
-        return axios.get(`${API_URL}/roles/${id}`).then(response => response.data);
+        try {
+            const response = await axios.get(`${API_URL}/roles/${id}`);
+            return response.data;
+        } catch (error) {
+            throw this.handleError(error);
+        }
     }
 
     async createRole(roleData) {
-        return axios.post(`${API_URL}/roles`, roleData).then(response => response.data);
+        try {
+            const response = await axios.post(`${API_URL}/roles`, roleData);
+            rolesCache = null; // Invalidate roles cache
+            return response.data;
+        } catch (error) {
+            throw this.handleError(error);
+        }
     }
 
     async updateRole(id, roleData) {
-        return axios.put(`${API_URL}/roles/${id}`, roleData).then(response => response.data);
+        try {
+            const response = await axios.put(`${API_URL}/roles/${id}`, roleData);
+            rolesCache = null; // Invalidate roles cache
+            return response.data;
+        } catch (error) {
+            throw this.handleError(error);
+        }
     }
 
     async deleteRole(id) {
-        return axios.delete(`${API_URL}/roles/${id}`);
+        try {
+            await axios.delete(`${API_URL}/roles/${id}`);
+            rolesCache = null; // Invalidate roles cache
+        } catch (error) {
+            throw this.handleError(error);
+        }
+    }
+
+    // User-Role Management
+    async assignRoleToUser(userId, roleId) {
+        try {
+            await axios.post(`${API_URL}/roles/${roleId}/users/${userId}`);
+            usersCache = null; // Invalidate users cache as user roles changed
+            rolesCache = null; // Invalidate roles cache as role assignments changed
+        } catch (error) {
+            throw this.handleError(error);
+        }
+    }
+
+    async removeRoleFromUser(userId, roleId) {
+        try {
+            await axios.delete(`${API_URL}/roles/${roleId}/users/${userId}`);
+            usersCache = null; // Invalidate users cache as user roles changed
+            rolesCache = null; // Invalidate roles cache as role assignments changed
+        } catch (error) {
+            throw this.handleError(error);
+        }
+    }
+
+    async updateUserRole(userId, role) {
+        try {
+            const response = await axios.post(`${API_URL}/users/${userId}/roles`, {
+                role: role
+            });
+            usersCache = null; // Invalidate users cache as user roles changed
+            rolesCache = null; // Invalidate roles cache as role assignments changed
+            return response.data;
+        } catch (error) {
+            throw this.handleError(error);
+        }
     }
 
     handleError(error) {
-        console.error('Error processing:', error);
         if (error.response) {
-            // Server returned error response
             return error.response.data || 'An error occurred';
         } else if (error.request) {
-            // Request made but no response received
-            console.error('No response from server:', error.request);
             return 'Server is not responding. Please check your connection.';
         } else {
-            // Request configuration error
-            console.error('Request configuration error:', error.message);
             return error.message;
         }
     }
@@ -175,16 +266,11 @@ class AuthService {
             username: username,
             email: email,
             password: password,
-            firstName: "",  // Valeur par défaut
-            lastName: ""    // Valeur par défaut
+            firstName: "",
+            lastName: ""
         };
         
-        return axios.post(`${API_URL}/users/superuser`, data, {
-            headers: {
-                'Content-Type': 'application/json',
-                'Accept': 'application/json'
-            }
-        });
+        return axios.post(`${API_URL}/users/superuser`, data);
     }
 
     async changePassword(currentPassword, newPassword) {
@@ -198,22 +284,7 @@ class AuthService {
             throw this.handleError(error);
         }
     }
-
-    async updateUserRole(userId, role) {
-        try {
-            const response = await axios.post(`${API_URL}/users/${userId}/roles`, {
-                role: role
-            }, {
-                headers: {
-                    'Authorization': `Bearer ${localStorage.getItem('token')}`
-                }
-            });
-            return response.data;
-        } catch (error) {
-            throw this.handleError(error);
-        }
-    }
 }
 
 const authServiceInstance = new AuthService();
-export default authServiceInstance; 
+export default authServiceInstance;

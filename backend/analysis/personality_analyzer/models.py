@@ -2,6 +2,12 @@ from django.db import models
 from django.contrib.postgres.fields import ArrayField
 from django.utils import timezone
 from django.core.exceptions import ValidationError
+import os
+from huggingface_hub import snapshot_download
+import logging
+import time
+
+logger = logging.getLogger(__name__)
 
 class Dataset(models.Model):
     """Model to track downloaded datasets"""
@@ -36,6 +42,9 @@ class TrainedModel(models.Model):
     metrics = models.JSONField(default=dict)  # Training metrics
     datasets_used = models.ManyToManyField(Dataset)
     parameters = models.JSONField(default=dict)  # Model hyperparameters
+    is_active = models.BooleanField(default=False)  # Whether this is the active model for its type
+    status = models.CharField(max_length=20, default='pending')  # pending, training, completed, failed
+    error_message = models.TextField(null=True, blank=True)  # Store error messages if training fails
 
     def __str__(self):
         return f"{self.name} v{self.version} ({self.model_type})"
@@ -43,6 +52,15 @@ class TrainedModel(models.Model):
     def is_recent(self, days=30):
         """Check if model was trained/used recently"""
         return (timezone.now() - self.last_used).days < days
+
+    def mark_as_active(self):
+        """Mark this model as active and deactivate others of the same type"""
+        TrainedModel.objects.filter(
+            model_type=self.model_type,
+            is_active=True
+        ).exclude(id=self.id).update(is_active=False)
+        self.is_active = True
+        self.save()
 
 class PersonalityAnalysis(models.Model):
     """Model to store personality analysis results"""
@@ -108,4 +126,52 @@ class TrainingData(models.Model):
         verbose_name_plural = 'Training Datasets'
     
     def __str__(self):
-        return f"{self.dataset_name} ({self.model_type})" 
+        return f"{self.dataset_name} ({self.model_type})"
+
+def download_model(model_name, cache_dir=None):
+    """
+    Download a model from Hugging Face with improved timeout and retry handling.
+    
+    Args:
+        model_name (str): Name of the model to download
+        cache_dir (str): Optional directory to cache the model
+    """
+    if cache_dir is None:
+        cache_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'models')
+    
+    os.makedirs(cache_dir, exist_ok=True)
+    
+    # Set longer timeout and retry parameters
+    timeout = 600  # 10 minutes
+    max_retries = 5
+    retry_delay = 30  # seconds
+    
+    for attempt in range(max_retries):
+        try:
+            logger.info(f"Downloading model {model_name} (attempt {attempt + 1}/{max_retries})")
+            
+            # Configure the download with longer timeout
+            snapshot_download(
+                repo_id=model_name,
+                cache_dir=cache_dir,
+                local_files_only=False,
+                force_download=True,
+                timeout=timeout,
+                resume_download=True,
+                proxies=None
+            )
+            
+            logger.info(f"Successfully downloaded model {model_name}")
+            return True
+            
+        except Exception as e:
+            logger.warning(f"Attempt {attempt + 1} failed: {str(e)}")
+            if attempt < max_retries - 1:
+                logger.info(f"Retrying in {retry_delay} seconds...")
+                time.sleep(retry_delay)
+                retry_delay *= 2  # Exponential backoff
+            else:
+                logger.error(f"Failed to download model {model_name} after {max_retries} attempts")
+                raise
+    
+    return False 
