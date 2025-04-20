@@ -1,21 +1,28 @@
-FROM node:16-alpine
+FROM node:18-alpine
 
 WORKDIR /app
 
 # Install required system dependencies
 RUN apk add --no-cache python3 make g++
 
-# Configure npm for development
+# Configure npm for better reliability
 ENV NODE_ENV=development
 ENV CHOKIDAR_USEPOLLING=true
 ENV WATCHPACK_POLLING=true
 ENV FAST_REFRESH=true
+ENV NPM_CONFIG_FETCH_TIMEOUT=60000
+ENV NPM_CONFIG_FETCH_RETRIES=5
+ENV NPM_CONFIG_FETCH_RETRY_FACTOR=2
+ENV NPM_CONFIG_FETCH_RETRY_MINTIMEOUT=10000
+ENV NPM_CONFIG_FETCH_RETRY_MAXTIMEOUT=60000
 
 # Copy package files
 COPY package*.json ./
 
-# Install dependencies
-RUN npm install --legacy-peer-deps
+# Install dependencies with retry mechanism
+RUN npm config set registry https://registry.npmjs.org/ && \
+    npm cache clean --force && \
+    npm install --legacy-peer-deps --fetch-timeout=60000
 
 # Copy source code
 COPY . .
@@ -27,18 +34,27 @@ EXPOSE 3000
 CMD ["npm", "start"]
 
 # Production build stage
-FROM node:16-alpine as build
+FROM node:18-alpine as build
 
 WORKDIR /app
 
 # Install required system dependencies
 RUN apk add --no-cache python3 make g++
 
+# Configure npm for better reliability
+ENV NPM_CONFIG_FETCH_TIMEOUT=60000
+ENV NPM_CONFIG_FETCH_RETRIES=5
+ENV NPM_CONFIG_FETCH_RETRY_FACTOR=2
+ENV NPM_CONFIG_FETCH_RETRY_MINTIMEOUT=10000
+ENV NPM_CONFIG_FETCH_RETRY_MAXTIMEOUT=60000
+
 # Copy package files
 COPY package*.json ./
 
-# Install dependencies
-RUN npm install --legacy-peer-deps
+# Install dependencies with retry mechanism
+RUN npm config set registry https://registry.npmjs.org/ && \
+    npm cache clean --force && \
+    npm install --legacy-peer-deps --fetch-timeout=60000
 
 # Copy source code
 COPY . .
