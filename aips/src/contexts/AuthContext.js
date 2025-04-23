@@ -23,16 +23,15 @@ export function AuthProvider({ children }) {
   };
 
   useEffect(() => {
-    // Vérifier le token au chargement
     const token = localStorage.getItem('token');
     if (token) {
-      // Décoder le token JWT et vérifier sa validité
+    // Decode the JWT token and verify its validity
       try {
         const decoded = JSON.parse(atob(token.split('.')[1]));
         if (decoded.exp * 1000 > Date.now()) {
           setIsAuthenticated(true);
           setUser(decoded);
-          // Récupérer les rôles de l'utilisateur
+        // Retrieve the user's roles
           fetchUserRoles(decoded.sub).then(userRoles => {
             setRoles(userRoles);
           });
@@ -50,7 +49,7 @@ export function AuthProvider({ children }) {
     const decoded = JSON.parse(atob(token.split('.')[1]));
     setIsAuthenticated(true);
     setUser(decoded);
-    // Récupérer les rôles de l'utilisateur
+    // Retrieve the user's roles
     const userRoles = await fetchUserRoles(decoded.sub);
     setRoles(userRoles);
   };

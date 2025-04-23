@@ -2,31 +2,32 @@ import React, { useState, useEffect } from 'react';
 import { Container, Typography, Grid, TextField, Button, Card, CardContent, Box, Alert } from '@mui/material';
 import { Email, Phone, LocationOn, AttachFile } from '@mui/icons-material';
 import { useLocation } from 'react-router-dom';
-import { useAuth } from '../contexts/AuthContext'; // Supposons qu'il existe un contexte d'authentification
+import { useAuth } from '../contexts/AuthContext'; // Assume there is an authentication context
 
 const Contact = () => {
   const [formStatus, setFormStatus] = useState('');
   const [message, setMessage] = useState('');
   const [file, setFile] = useState(null);
   const location = useLocation();
-  const { user } = useAuth(); // Récupération des informations de l'utilisateur connecté
+  const { user } = useAuth(); // Retrieve information of the logged-in user
 
-  // Valeurs par défaut des champs du formulaire
+
+// Default values for the form fields
   const [formValues, setFormValues] = useState({
     firstName: '',
     lastName: '',
     email: '',
-    subject: 'Problème avec les modèles d\'analyse'
+    subject: 'Problem with the analysis models\n'
   });
 
-  // Pré-remplir les champs si l'utilisateur est connecté
+// Pre-fill the fields if the user is logged in
   useEffect(() => {
     if (user) {
       setFormValues({
         firstName: user.firstName || '',
         lastName: user.lastName || '',
         email: user.email || '',
-        subject: location.state?.subject || 'Problème avec les modèles d\'analyse'
+        subject: location.state?.subject || ' Problem with the analysis models\n'
       });
     }
   }, [user, location]);
@@ -42,7 +43,7 @@ const Contact = () => {
   const handleSubmit = (event) => {
     event.preventDefault();
     
-    // Création d'un objet FormData pour l'envoi du fichier
+    // Create a FormData object for sending the file
     const formData = new FormData();
     formData.append('firstName', formValues.firstName);
     formData.append('lastName', formValues.lastName);
@@ -53,9 +54,9 @@ const Contact = () => {
       formData.append('file', file);
     }
     
-    // Ici, vous ajouteriez la logique d'envoi du formulaire avec le fichier
-    // par exemple: await contactService.submitContactForm(formData);
-    
+    // Here, you would add the logic to submit the form with the file
+    // for example: await contactService.submitContactForm(formData);
+
     setFormStatus('success');
     setMessage('');
     setFile(null);
@@ -185,7 +186,7 @@ const Contact = () => {
                       startIcon={<AttachFile />}
                       sx={{ mb: 2 }}
                     >
-                      Joindre un fichier
+                      Submit Attachments
                       <input
                         type="file"
                         hidden

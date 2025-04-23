@@ -6,7 +6,6 @@ const Breadcrumb = () => {
   const location = useLocation();
   const pathnames = location.pathname.split('/').filter((x) => x);
 
-  // Mapping des routes pour un affichage plus convivial
   const routeNames = {
     'analysis': 'Analysis',
     'backoffice': 'Backoffice',

@@ -29,8 +29,8 @@ class PersonalityAnalysisViewSet(viewsets.ModelViewSet):
     @action(detail=False, methods=['POST'])
     def analyze_text(self, request):
         """
-        Endpoint pour analyser un texte directement
-        """
+        Endpoint to directly analyse a text
+         """
         try:
             serializer = AnalysisRequestSerializer(data=request.data)
             if not serializer.is_valid():
@@ -65,7 +65,7 @@ class PersonalityAnalysisViewSet(viewsets.ModelViewSet):
     @action(detail=False, methods=['POST'])
     def analyze_social_media(self, request):
         """
-        Endpoint pour analyser un profil social media
+         Endpoint to analyse a social media profile
         """
         try:
             required_fields = ['platform', 'username', 'start_date', 'end_date']
@@ -125,7 +125,7 @@ class PersonalityAnalysisViewSet(viewsets.ModelViewSet):
     @action(detail=False, methods=['GET'])
     def task_status(self, request):
         """
-        Vérifier le statut d'une tâche d'analyse
+         Check the status of an analysis task
         """
         task_id = request.query_params.get('task_id')
         if not task_id:
@@ -219,7 +219,7 @@ class PersonalityAnalysisViewSet(viewsets.ModelViewSet):
 
 class TrainedModelViewSet(viewsets.ModelViewSet):
     """
-    ViewSet pour la gestion des modèles entraînés
+     ViewSet for managing trained models
     """
     queryset = TrainedModel.objects.all()
     serializer_class = TrainedModelSerializer
@@ -228,7 +228,7 @@ class TrainedModelViewSet(viewsets.ModelViewSet):
     @action(detail=False, methods=['POST'])
     def train_model(self, request):
         """
-        Endpoint pour lancer l'entraînement d'un nouveau modèle
+        Endpoint to launch the training of a new model
         """
         try:
             if 'dataset_ids' not in request.data or 'model_type' not in request.data:
@@ -255,17 +255,17 @@ class TrainedModelViewSet(viewsets.ModelViewSet):
     @action(detail=True, methods=['POST'])
     def activate(self, request, pk=None):
         """
-        Activer un modèle spécifique
+         Activate a specific model
         """
         model = self.get_object()
         try:
-            # Désactiver les autres modèles du même type
+            # Deactivate other models of the same type
             TrainedModel.objects.filter(
                 model_type=model.model_type,
                 is_active=True
             ).update(is_active=False)
             
-            # Activer le modèle sélectionné
+            # Activate the selected model
             model.is_active = True
             model.save()
 
@@ -282,7 +282,7 @@ class TrainedModelViewSet(viewsets.ModelViewSet):
 
 class DatasetViewSet(viewsets.ModelViewSet):
     """
-    ViewSet pour la gestion des datasets
+    ViewSet for managing datasets
     """
     queryset = Dataset.objects.all()
     serializer_class = DatasetSerializer
@@ -291,7 +291,7 @@ class DatasetViewSet(viewsets.ModelViewSet):
     @action(detail=False, methods=['POST'])
     def import_dataset(self, request):
         """
-        Endpoint pour importer un nouveau dataset
+        Endpoint to import a new dataset
         """
         try:
             if 'file' not in request.FILES:
@@ -299,8 +299,8 @@ class DatasetViewSet(viewsets.ModelViewSet):
                     'error': 'No file provided'
                 }, status=status.HTTP_400_BAD_REQUEST)
 
-            # Logique d'import du dataset
-            # TODO: Implémenter la logique d'import
+            # Dataset import logic
+            # Implement the import logic
 
             return Response({
                 'status': 'success',
@@ -316,10 +316,10 @@ class DatasetViewSet(viewsets.ModelViewSet):
     @action(detail=False, methods=['POST'])
     def fetch_kaggle_datasets(self, request):
         """
-        Endpoint pour télécharger automatiquement des datasets depuis Kaggle
+         Endpoint to automatically download datasets from Kaggle
         """
         try:
-            # Lancer la tâche asynchrone
+            # Launch the asynchronous task
             task = fetch_kaggle_datasets.delay()
             
             return Response({

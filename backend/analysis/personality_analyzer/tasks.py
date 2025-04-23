@@ -792,11 +792,9 @@ def fetch_kaggle_datasets() -> Dict:
                 'message': f"Kaggle authentication error: {str(e)}"
             }
         
-        # Créer les répertoires de données s'ils n'existent pas
         data_dir = os.path.join(settings.DATA_DIR, 'datasets', 'kaggle')
         os.makedirs(data_dir, exist_ok=True)
         
-        # Définir les datasets simplifiés (sans utiliser dataset_view)
         datasets = [
             {
                 'id': 'datasnaek/mbti-type',
@@ -810,7 +808,7 @@ def fetch_kaggle_datasets() -> Dict:
                 'name': 'Big Five Personality Test Dataset',
                 'type': 'OCEAN',
                 'description': 'Dataset pour le modèle Big Five (OCEAN)',
-                'filename': 'data-final.csv',  # Nom corrigé pour le fichier principal
+                'filename': 'data-final.csv',
                 'alternative_filenames': ['data.csv', 'IPIP-FFM-data-8Nov2018.csv', 'data-final.csv']
             }
         ]
@@ -818,11 +816,9 @@ def fetch_kaggle_datasets() -> Dict:
         results = []
         for dataset in datasets:
             try:
-                # Créer le répertoire pour le type de dataset
                 dataset_path = os.path.join(data_dir, dataset['type'].lower())
                 os.makedirs(dataset_path, exist_ok=True)
                 
-                # Créer un sous-répertoire pour ce dataset spécifique
                 dataset_id_path = dataset['id'].split('/')[1]
                 dataset_specific_path = os.path.join(dataset_path, dataset_id_path)
                 os.makedirs(dataset_specific_path, exist_ok=True)
@@ -830,12 +826,11 @@ def fetch_kaggle_datasets() -> Dict:
                 logger.info(f"Downloading dataset {dataset['name']} from Kaggle...")
                 
                 try:
-                    # Télécharger le dataset de manière simplifiée
                     kaggle.api.dataset_download_files(
                         dataset['id'],
                         path=dataset_specific_path,
                         unzip=True,
-                        quiet=False  # Afficher la progression
+                        quiet=False
                     )
                     
                     # Check if download was successful by looking for the main file
@@ -864,15 +859,12 @@ def fetch_kaggle_datasets() -> Dict:
                                 file_size = os.path.getsize(expected_file)
                                 logger.info(f"Found CSV file with different name: {csv_files[0]} instead of {dataset.get('filename', '')}")
                             else:
-                                # Rechercher tout fichier texte qui pourrait être converti
                                 text_files = [f for f in os.listdir(dataset_specific_path) if f.endswith('.txt') or f.endswith('.tab') or f.endswith('.data')]
                                 if text_files:
                                     text_file = os.path.join(dataset_specific_path, text_files[0])
                                     logger.info(f"Found text file to convert: {text_files[0]}")
                                     
-                                    # Essayer de convertir le fichier texte en CSV
                                     try:
-                                        # Détecter si c'est un TSV ou un fichier délimité
                                         with open(text_file, 'r', encoding='utf-8', errors='ignore') as f:
                                             sample = f.read(1024)
                                         
@@ -885,7 +877,6 @@ def fetch_kaggle_datasets() -> Dict:
                                             delimiter = None
                                         
                                         if delimiter:
-                                            # Lire le fichier et le convertir en CSV
                                             df = pd.read_csv(text_file, delimiter=delimiter, on_bad_lines='warn')
                                             csv_output = os.path.join(dataset_specific_path, 'converted_data.csv')
                                             df.to_csv(csv_output, index=False)
@@ -893,7 +884,6 @@ def fetch_kaggle_datasets() -> Dict:
                                             file_size = os.path.getsize(expected_file)
                                             logger.info(f"Successfully converted {text_files[0]} to CSV")
                                         else:
-                                            # Si nous ne pouvons pas détecter le délimiteur, essayer read_fwf (format à largeur fixe)
                                             try:
                                                 df = pd.read_fwf(text_file, on_bad_lines='warn')
                                                 csv_output = os.path.join(dataset_specific_path, 'converted_data.csv')
@@ -908,7 +898,6 @@ def fetch_kaggle_datasets() -> Dict:
                                         logger.error(f"Failed to convert text file to CSV: {str(conv_error)}")
                                         raise ValueError(f"Failed to convert {text_files[0]} to CSV")
                                 else:
-                                    # Tenter une recherche récursive de fichiers CSV dans les sous-répertoires
                                     csv_files = []
                                     for root, dirs, files in os.walk(dataset_specific_path):
                                         for file in files:
@@ -920,7 +909,6 @@ def fetch_kaggle_datasets() -> Dict:
                                         file_size = os.path.getsize(expected_file)
                                         logger.info(f"Found CSV file in subdirectory: {expected_file}")
                                     else:
-                                        # Recherche de fichiers Excel qui pourraient être convertis
                                         excel_files = []
                                         for root, dirs, files in os.walk(dataset_specific_path):
                                             for file in files:
@@ -949,7 +937,6 @@ def fetch_kaggle_datasets() -> Dict:
                                             logger.error(f"No suitable files found in {dataset_specific_path}. Available files: {all_files}")
                                             raise ValueError(f"No suitable file found in {dataset_specific_path}")
 
-                    # Créer ou mettre à jour l'enregistrement du dataset
                     db_dataset, created = Dataset.objects.update_or_create(
                         dataset_id=dataset['id'],
                         defaults={

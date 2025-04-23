@@ -152,8 +152,8 @@ class AnalysisService {
   }
 
   /**
-   * Obtenir le nombre total de données dans le dataset
-   * @param {string} datasetId - ID du dataset
+   * Get the total number of records in the dataset
+   * @param {string} datasetId - ID dataset
    * @returns {Promise} Response containing dataset total count
    */
   async getDatasetTotalCount(datasetId) {
@@ -161,9 +161,9 @@ class AnalysisService {
   }
 
   /**
-   * Analyser un échantillon aléatoire de données du dataset
-   * @param {string} datasetId - ID du dataset
-   * @param {number} sampleSize - Nombre d'entrées à analyser (échantillon)
+   * Analyse a random sample of data from the dataset
+   * @param {string} datasetId - ID  dataset
+   * @param {number} sampleSize - Analyse a random sample of data from the dataset
    * @returns {Promise} Response containing analysis of random sample
    */
   async analyzeRandomSample(datasetId, sampleSize = 100) {

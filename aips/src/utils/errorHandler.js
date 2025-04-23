@@ -1,12 +1,12 @@
 export const handleApiError = (error) => {
   if (error.response) {
-    // Erreur de réponse du serveur
+// Server response error
     return error.response.data.message || 'Server error';
   } else if (error.request) {
-    // Pas de réponse du serveur
+// No response from the server
     return 'Network error';
   } else {
-    // Erreur de configuration de la requête
+// Request configuration error
     return 'Request error';
   }
 }; 

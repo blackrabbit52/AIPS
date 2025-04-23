@@ -73,10 +73,10 @@ public class AuthenticationService {
 
             SecurityContextHolder.getContext().setAuthentication(authentication);
             
-            // Récupérer le UserPrincipal depuis l'authentification
+            // Retrieve the UserPrincipal from the authentication
             UserPrincipal userPrincipal = (UserPrincipal) authentication.getPrincipal();
             
-            // Générer le token avec le UserPrincipal (qui implémente UserDetails)
+            // Generate the token using the UserPrincipal (which implements UserDetails)
             String jwt = tokenProvider.generateToken(userPrincipal);
 
             return new JwtAuthenticationResponse(
@@ -103,17 +103,16 @@ public class AuthenticationService {
      */
     @Transactional
     public ResponseEntity<?> registerUser(SignUpRequest request) {
-        // Vérifier si l'username existe déjà
         if (userRepository.existsByUsername(request.getUsername())) {
             return ResponseEntity.badRequest().body("Username is already taken");
         }
 
-        // Vérifier si l'email existe déjà
+        // Verify email
         if (userRepository.existsByEmail(request.getEmail())) {
             return ResponseEntity.badRequest().body("Email is already in use");
         }
 
-        // Créer un nouvel utilisateur
+        // create new user
         User user = new User();
         user.setUsername(request.getUsername());
         user.setEmail(request.getEmail());
@@ -134,7 +133,7 @@ public class AuthenticationService {
         roles.add(defaultRole);
         user.setRoles(roles);
 
-        // Sauvegarder l'utilisateur
+        // save user
         User result = userRepository.save(user);
         
         return ResponseEntity.ok(convertToUserResponse(result));

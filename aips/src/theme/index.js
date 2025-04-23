@@ -1,9 +1,9 @@
 import { createTheme } from '@mui/material';
 
-// Créer une fonction qui retourne le thème selon le mode
+// Create a function that returns the theme based on the mode
 export const createAppTheme = (mode) => createTheme({
   palette: {
-    mode, // 'light' ou 'dark'
+    mode, // 'light' or 'dark'
     primary: {
       main: '#1976d2',
       light: '#42a5f5',

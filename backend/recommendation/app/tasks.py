@@ -5,26 +5,27 @@ from sklearn.metrics.pairwise import cosine_similarity
 
 @celery.task
 def calculate_team_role_recommendation(personality_traits):
-    """Calculer la recommandation de rôle d'équipe basée sur les traits de personnalité."""
-    
-    # Récupérer tous les rôles disponibles
+    """Calculate team role recommendation based on personality traits."""
+
+    # Retrieve all available roles
     roles = TeamRole.query.all()
-    
-    # Calculer les scores de similarité pour chaque rôle
+
+    # Calculate similarity scores for each role
     scores = []
     for role in roles:
-        # Convertir les traits en vecteurs numériques
+        # Calculate similarity scores for each role
+        # Convert traits into numerical vectors
         role_traits = np.array(list(role.required_traits.values())).reshape(1, -1)
         user_traits = np.array(list(personality_traits.values())).reshape(1, -1)
-        
-        # Calculer la similarité cosinus
+
+        # Calculate cosine similarity
         similarity = cosine_similarity(role_traits, user_traits)[0][0]
         scores.append((role, similarity))
-    
-    # Trier les rôles par score de similarité
+
+    # Sort the roles by similarity score
     scores.sort(key=lambda x: x[1], reverse=True)
-    
-    # Créer une nouvelle recommandation pour le meilleur rôle
+
+    # Create a new recommendation for the best role
     best_role, best_score = scores[0]
     recommendation = Recommendation(
         user_id=1,  # TODO: Use actual user ID from request

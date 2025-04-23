@@ -56,12 +56,13 @@ const AnalysisTemplates = () => {
       type: 'performance',
       metrics: ['efficiency', 'productivity', 'quality']
     },
-    // ... autres templates
+    // ... other templates
+
   ]);
   const [openDialog, setOpenDialog] = useState(false);
   const [currentTemplate, setCurrentTemplate] = useState(null);
   
-  // États pour la gestion des modèles
+// States for managing models
   const [loading, setLoading] = useState(false);
   const [modelsAvailable, setModelsAvailable] = useState(false);
   const [taskId, setTaskId] = useState(null);
@@ -76,10 +77,10 @@ const AnalysisTemplates = () => {
   const { showNotification } = useNotification();
   const { handleError } = useError();
   
-  // État pour suivre l'étape actuelle du processus
+// State to track the current step of the process
   const [activeStep, setActiveStep] = useState(0);
   
-  // Définition des étapes du processus
+// Definition of the steps in the process
   const steps = [
     "Downloading Datasets",
     "Processing Data",
@@ -87,12 +88,12 @@ const AnalysisTemplates = () => {
     "Finalizing"
   ];
 
-  // Vérifier l'état des modèles au chargement
+// Check the status of the models on load
   useEffect(() => {
     checkModelsStatus();
   }, []);
 
-  // Vérifier l'état de la tâche en cours
+// Check the status of the ongoing task
   useEffect(() => {
     let statusInterval;
     if (taskId) {
@@ -123,7 +124,7 @@ const AnalysisTemplates = () => {
       const response = await AnalysisService.checkTaskStatus(taskId);
       setTaskStatus(response.data);
       
-      // Extraire les informations de progression
+      // Extract progress information
       if (response.data.result && response.data.result.progress) {
         setTaskProgress(response.data.result.progress);
       }
@@ -132,13 +133,13 @@ const AnalysisTemplates = () => {
         setTotalDownloaded(response.data.result.total_downloaded);
       }
       
-      // Déterminer l'étape actuelle en fonction du statut ou des messages
+      // Determine the current step based on status or messages
       if (response.data.result && response.data.result.current_step) {
         setActiveStep(response.data.result.current_step);
       } else if (response.data.status === 'PENDING') {
-        setActiveStep(0); // Téléchargement des datasets
+        setActiveStep(0);
       } else if (response.data.status === 'STARTED') {
-        // Essayez de déduire l'étape à partir du message ou de la progression
+        // Try to infer the step from the message or progress
         if (response.data.result && response.data.result.message) {
           const message = safeToString(response.data.result.message).toLowerCase();
           if (message.includes('download')) setActiveStep(0);
@@ -155,10 +156,10 @@ const AnalysisTemplates = () => {
           setActiveStep(3);
         }
       } else if (response.data.status === 'SUCCESS') {
-        setActiveStep(steps.length - 1); // Dernière étape
+        setActiveStep(steps.length - 1);
       }
       
-      // Vérifier si la tâche est terminée
+      // Check if the task is completed
       if (response.data.status === 'SUCCESS') {
         showNotification("Models trained successfully", "success");
         setTaskId(null);
@@ -173,7 +174,7 @@ const AnalysisTemplates = () => {
   };
 
   const handleTrainModels = async () => {
-    // Filtrer les modèles sélectionnés
+    // Filter the selected models
     const modelsToTrain = Object.keys(selectedModels).filter(key => selectedModels[key]);
     
     if (modelsToTrain.length === 0) {
@@ -209,7 +210,6 @@ const AnalysisTemplates = () => {
   };
 
   const handleSave = (template) => {
-    // Logique de sauvegarde
     setOpenDialog(false);
   };
 
@@ -237,7 +237,7 @@ const AnalysisTemplates = () => {
         </Button>
       </Box>
       
-      {/* Section Gestion des Modèles */}
+      {}
       <Paper elevation={2} sx={{ p: 3, mb: 4 }}>
         <Typography variant="h5" gutterBottom>Analysis Models Management</Typography>
         <Divider sx={{ mb: 3 }} />
@@ -423,14 +423,13 @@ const AnalysisTemplates = () => {
 };
 
 const TemplateDialog = ({ open, onClose, template, onSave }) => {
-  // ... logique du dialogue
   return (
     <Dialog open={open} onClose={onClose} maxWidth="md" fullWidth>
       <DialogTitle>
         {template ? 'Edit Template' : 'Create Template'}
       </DialogTitle>
       <DialogContent>
-        {/* Formulaire du template */}
+        {}
       </DialogContent>
       <DialogActions>
         <Button onClick={onClose}>Cancel</Button>

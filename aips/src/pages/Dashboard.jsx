@@ -44,7 +44,7 @@ const Dashboard = () => {
         </Grid>
       </Grid>
       
-      {/* Reste du contenu */}
+      {/* // Remaining content */}
     </Container>
   );
 };

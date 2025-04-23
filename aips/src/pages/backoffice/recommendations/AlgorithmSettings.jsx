@@ -24,7 +24,6 @@ const AlgorithmSettings = () => {
   const [saved, setSaved] = useState(false);
 
   const handleSave = () => {
-    // Logique de sauvegarde
     setSaved(true);
     setTimeout(() => setSaved(false), 3000);
   };

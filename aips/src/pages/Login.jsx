@@ -42,7 +42,7 @@ const Login = () => {
   const location = useLocation();
   const { showNotification } = useNotification();
 
-  // Vérifier si l'utilisateur est déjà connecté
+// Check if the user is already logged in
   useEffect(() => {
     if (authService.getCurrentUser()?.isAuthenticated) {
       navigate('/dashboard');
@@ -76,7 +76,7 @@ const Login = () => {
     }
   });
 
-  // Afficher le message de succès après l'inscription
+// Display the success message after registration
   React.useEffect(() => {
     if (location.state?.message) {
       // Message de succès après inscription

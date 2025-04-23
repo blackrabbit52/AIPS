@@ -5,7 +5,7 @@ from flask_cors import CORS
 from celery import Celery
 import os
 
-# Initialisation des extensions
+# Initialise extensions
 db = SQLAlchemy()
 migrate = Migrate()
 celery = Celery()
@@ -19,7 +19,7 @@ def create_app():
     app.config['CELERY_BROKER_URL'] = os.getenv('CELERY_BROKER_URL', 'redis://redis:6379/0')
     app.config['CELERY_RESULT_BACKEND'] = os.getenv('CELERY_RESULT_BACKEND', 'redis://redis:6379/0')
     
-    # Initialisation des extensions
+    # Initialise extensions
     CORS(app)
     db.init_app(app)
     migrate.init_app(app, db)
@@ -27,7 +27,7 @@ def create_app():
     # Configuration Celery
     celery.conf.update(app.config)
     
-    # Enregistrement des blueprints
+    # Registering blueprints
     from .routes import recommendation_bp
     app.register_blueprint(recommendation_bp, url_prefix='/api/recommend')
     

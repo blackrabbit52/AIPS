@@ -155,7 +155,6 @@ const FAQDialog = ({ open, onClose, faq, categories }) => {
       <DialogActions>
         <Button onClick={onClose}>Cancel</Button>
         <Button variant="contained" onClick={() => {
-          // Logique de sauvegarde
           onClose();
         }}>
           Save

@@ -38,7 +38,7 @@ const Profile = () => {
   return (
     <Container maxWidth="lg">
       <Grid container spacing={3}>
-        {/* Informations utilisateur */}
+        {/* Information utiliser */}
         <Grid item xs={12} md={4}>
           <Paper sx={{ p: 3 }}>
             <Typography variant="h6">Profile Information</Typography>
@@ -54,7 +54,7 @@ const Profile = () => {
           </Paper>
         </Grid>
 
-        {/* Liste des analyses */}
+        {/* List of analyses */}
         <Grid item xs={12} md={8}>
           <Typography variant="h6" gutterBottom>
             My Analyses

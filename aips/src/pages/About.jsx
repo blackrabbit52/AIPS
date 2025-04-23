@@ -18,13 +18,13 @@ const About = () => {
 
   const team = [
     {
-      name: "John Doe",
+      name: "Jaynie Akogwu",
       role: "CEO & Founder",
       image: "/path/to/image1.jpg", // Replace with actual images
-      description: "Expert in AI and Data Analysis with 15 years of experience"
+      description: "Computer Science Student at Nottingham Trent University"
     },
     {
-      name: "Jane Smith",
+      name: "Sol",
       role: "Lead Developer",
       image: "/path/to/image2.jpg",
       description: "Full-stack developer specialized in data visualization"
@@ -135,9 +135,9 @@ const About = () => {
       </Typography>
       <Grid container spacing={4}>
         {[
-          { name: 'blackrabbit52 On github', role: 'Founder & CEO', avatar: 'JAYNIE' },
-          { name: 'John Doe', role: 'CTO', avatar: 'JD' },
-          { name: 'Jane Smith', role: 'Lead Developer', avatar: 'JS' }
+          { name: 'Jaynie', role: 'Founder & CEO', avatar: 'JAYNIE' },
+          { name: 'Sol', role: 'BAN', avatar: 'SK' },
+          { name: 'Kayla', role: 'Lead Developer', avatar: 'KO' }
         ].map((member) => (
           <Grid item xs={12} sm={6} md={4} key={member.name}>
             <Card sx={{ textAlign: 'center' }}>
@@ -150,7 +150,8 @@ const About = () => {
               </CardContent>
             </Card>
           </Grid>
-        ))}
+        ))
+        }
       </Grid>
     </Container>
   );

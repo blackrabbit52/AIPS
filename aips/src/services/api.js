@@ -2,7 +2,8 @@ import axios from 'axios';
 
 const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:8888';
 
-// Création de l'instance axios
+// // Number of entries to analyse (sample)
+// // Create the axios instance
 const api = axios.create({
   baseURL: API_URL,
   headers: {
@@ -10,7 +11,7 @@ const api = axios.create({
   },
 });
 
-// Intercepteur pour ajouter le token aux requêtes
+// Interceptor to add the token to requests
 api.interceptors.request.use(
   (config) => {
     const token = localStorage.getItem('token');
@@ -24,14 +25,14 @@ api.interceptors.request.use(
   }
 );
 
-// Services d'authentification
+// Service authentification
 export const authService = {
   login: (credentials) => api.post('/api/auth/login', credentials),
   register: (userData) => api.post('/api/auth/register', userData),
   getCurrentUser: () => api.get('/api/auth/user'),
 };
 
-// Services d'analyse
+// Services analyse
 export const analysisService = {
   analyzeText: (text) => api.post('/api/analysis/analyze/post', { text }),
   analyzePosts: (posts) => api.post('/api/analysis/analyze/posts', { posts }),
@@ -40,7 +41,7 @@ export const analysisService = {
   getTaskStatus: (taskId) => api.get(`/api/analysis/task/${taskId}`),
 };
 
-// Services de recommandation
+// Services  recommandation
 export const recommendationService = {
   getTeamRole: (personalityTraits) =>
     api.post('/api/recommend/team-role', { personality_traits: personalityTraits }),

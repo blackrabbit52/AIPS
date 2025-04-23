@@ -21,13 +21,13 @@ class PersonalityAnalysisSerializer(serializers.ModelSerializer):
         ]
 
     def validate_mbti_type(self, value):
-        """Valider le type MBTI"""
+        """Validate MBTI type"""
         if len(value) != 4 or not all(c in 'IEFSNTJP' for c in value):
             raise serializers.ValidationError("Invalid MBTI type format")
         return value
 
     def validate_ocean_scores(self, value):
-        """Valider les scores OCEAN"""
+        """Validate OCEAN scores"""
         required_traits = ['openness', 'conscientiousness', 'extraversion', 
                          'agreeableness', 'neuroticism']
         if not all(trait in value for trait in required_traits):
@@ -35,7 +35,7 @@ class PersonalityAnalysisSerializer(serializers.ModelSerializer):
                 f"OCEAN scores must contain: {', '.join(required_traits)}"
             )
         
-        # Vérifier que les scores sont entre 0 et 1
+        #Check that the scores are between 0 and 1
         for trait, score in value.items():
             if not 0 <= float(score) <= 1:
                 raise serializers.ValidationError(
@@ -83,7 +83,7 @@ class TrainingDataSerializer(serializers.ModelSerializer):
         read_only_fields = ['uploaded_at', 'last_used']
 
     def validate_source_url(self, value):
-        """Valider l'URL source"""
+        """Valid URL source"""
         if not value.startswith(('http://', 'https://')):
             raise serializers.ValidationError("Invalid URL format")
         return value
@@ -103,13 +103,13 @@ class DatasetSerializer(serializers.ModelSerializer):
         ]
 
     def validate_size(self, value):
-        """Valider la taille du dataset"""
+        """Validate the size of the dataset"""
         if value <= 0:
             raise serializers.ValidationError("Dataset size must be positive")
         return value
 
     def validate_metadata(self, value):
-        """Valider le format des métadonnées"""
+        """Validate the size of the dataset"""
         required_keys = ['description', 'format', 'version']
         if not all(key in value for key in required_keys):
             raise serializers.ValidationError(
@@ -134,7 +134,7 @@ class TrainedModelSerializer(serializers.ModelSerializer):
         read_only_fields = ['training_date', 'last_used', 'metrics']
 
     def validate_model_type(self, value):
-        """Valider le type de modèle"""
+        """Valid model type"""
         valid_types = ['MBTI', 'OCEAN']
         if value not in valid_types:
             raise serializers.ValidationError(
@@ -143,7 +143,7 @@ class TrainedModelSerializer(serializers.ModelSerializer):
         return value
 
     def validate_parameters(self, value):
-        """Valider les paramètres du modèle"""
+        """Valid model parameters"""
         required_params = ['batch_size', 'learning_rate', 'epochs']
         if not all(param in value for param in required_params):
             raise serializers.ValidationError(
@@ -172,7 +172,7 @@ class ModelTrainingRequestSerializer(serializers.Serializer):
     parameters = serializers.DictField(required=False)
 
     def validate_parameters(self, value):
-        """Valider les paramètres d'entraînement"""
+        """Validate the training parameters"""
         default_params = {
             'batch_size': 32,
             'learning_rate': 2e-5,
@@ -183,7 +183,7 @@ class ModelTrainingRequestSerializer(serializers.Serializer):
 
 class AnalysisRequestSerializer(serializers.Serializer):
     """
-    Serializer pour les requêtes d'analyse
+    Serializer for analysis requests
     """
     text = serializers.CharField(required=False)
     platform = serializers.CharField(required=False)
@@ -194,26 +194,26 @@ class AnalysisRequestSerializer(serializers.Serializer):
     def validate(self, data):
         """Valider la cohérence des données"""
         if 'text' in data:
-            # Validation pour l'analyse de texte direct
+            # Validate data consistency
             if len(data['text'].strip()) < 100:
                 raise serializers.ValidationError(
                     "Text must be at least 100 characters long"
                 )
         else:
-            # Validation pour l'analyse de médias sociaux
+            # Validation for direct text analysis
             required_fields = ['platform', 'username', 'start_date', 'end_date']
             if not all(field in data for field in required_fields):
                 raise serializers.ValidationError(
                     f"For social media analysis, required fields are: {', '.join(required_fields)}"
                 )
             
-            # Vérifier que start_date est avant end_date
+            #Check that start_date is before end_date
             if data['start_date'] >= data['end_date']:
                 raise serializers.ValidationError(
                     "start_date must be before end_date"
                 )
 
-            # Valider la plateforme
+            # Validate the platform
             valid_platforms = ['twitter', 'facebook', 'linkedin']
             if data['platform'].lower() not in valid_platforms:
                 raise serializers.ValidationError(

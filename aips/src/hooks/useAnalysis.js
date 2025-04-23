@@ -10,7 +10,7 @@ export const useAnalysis = () => {
   const submitAnalysis = useCallback(async (analysisData) => {
     setIsSubmitting(true);
     try {
-      // Ici, vous ajouterez plus tard l'appel API
+    // Here, you will later add the API call
       await new Promise(resolve => setTimeout(resolve, 2000)); // Simulation
       showNotification('Analysis started successfully!', 'success');
       return true;

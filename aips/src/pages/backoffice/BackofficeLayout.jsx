@@ -49,7 +49,6 @@ import {
 import { useAuth } from '../../contexts/AuthContext';
 import { useNotification } from '../../contexts/NotificationContext';
 
-// Largeur du drawer
 const drawerWidth = 240;
 
 export default function BackofficeLayout({ toggleTheme, isDarkMode }) {
@@ -61,46 +60,35 @@ export default function BackofficeLayout({ toggleTheme, isDarkMode }) {
   const { user } = useAuth();
   const { notifications } = useNotification();
   
-  // Filtrer les notifications non lues
   const unreadNotifications = notifications ? notifications.filter(notif => !notif.read) : [];
 
-  // Vérifier que l'utilisateur a les droits d'accès
   useEffect(() => {
-    console.log("Utilisateur dans BackofficeLayout:", user);
-    console.log("Rôles de l'utilisateur:", user?.roles);
+    console.log("BackofficeLayout:", user);
+    console.log("Roles :", user?.roles);
     
-    // Version temporaire pour debug - force l'accès au backoffice si un utilisateur est connecté
     if (!user) {
-      console.log("Redirection: Aucun utilisateur connecté");
+      console.log("Redirection:");
       navigate('/login');
       return;
     }
     
-    // Logs détaillés
-    console.log("Type de user.roles:", typeof user.roles);
+
+    console.log("Type of user.roles:", typeof user.roles);
     if (Array.isArray(user.roles)) {
-      console.log("user.roles est un tableau de longueur:", user.roles.length);
+      console.log("user.roles is an array of length:", user.roles.length);
     } else {
-      console.log("user.roles n'est PAS un tableau");
+      console.log("user.roles is NOT an array");
     }
     
     if (user.roles) {
-      console.log("Vérification ROLE_ADMIN:", user.roles.includes('ROLE_ADMIN'));
-      console.log("Vérification ROLE_SUPER_ADMIN:", user.roles.includes('ROLE_SUPER_ADMIN'));
+      console.log("Verification ROLE_ADMIN:", user.roles.includes('ROLE_ADMIN'));
+      console.log("Verification ROLE_SUPER_ADMIN:", user.roles.includes('ROLE_SUPER_ADMIN'));
     }
-    
-    // Force l'accès au backoffice temporairement pour le développement
-    // Commentez ou supprimez cette ligne en production
     return; 
-    
-    // Vérification des droits d'accès - commentée temporairement pour debug
-    // if (!user || !user.roles || !(user.roles.includes('ROLE_ADMIN') || user.roles.includes('ROLE_SUPER_ADMIN'))) {
-    //   console.log("Redirection: L'utilisateur n'a pas les rôles requis");
-    //   navigate('/');
-    // }
+
   }, [user, navigate]);
 
-  // Liste des menus du backoffice
+
   const menuItems = [
     { text: 'Dashboard', path: '/backoffice', icon: <DashboardIcon /> },
     { text: 'Users', path: '/backoffice/users', icon: <PeopleIcon /> },
@@ -153,23 +141,22 @@ export default function BackofficeLayout({ toggleTheme, isDarkMode }) {
     setDrawerOpen(!drawerOpen);
   };
 
-  // Génère le fil d'Ariane basé sur le chemin actuel
+
   const getBreadcrumbs = () => {
     const paths = location.pathname.split('/').filter(Boolean);
     
-    // Breadcrumb toujours avec "Home" en premier
+
     const breadcrumbs = [
       { text: 'Home', path: '/' }
     ];
 
-    // Si nous sommes dans le backoffice, ajoutons-le
+
     if (paths.includes('backoffice')) {
       breadcrumbs.push({ text: 'Backoffice', path: '/backoffice' });
       
-      // Pour les sous-sections du backoffice
+
       if (paths.length > 1 && paths[0] === 'backoffice') {
         const currentPath = paths[1];
-        // Trouver le menu item correspondant pour obtenir le texte propre
         const menuItem = menuItems.find(item => item.path.includes(currentPath));
         if (menuItem && currentPath !== '') {
           breadcrumbs.push({ 
@@ -272,7 +259,7 @@ export default function BackofficeLayout({ toggleTheme, isDarkMode }) {
               </Tooltip>
             </ListItem>
             
-            {/* Sous-menus */}
+            {}
             {drawerOpen && item.subItems && (
               <List component="div" disablePadding>
                 {item.subItems.map((subItem) => (
@@ -351,7 +338,7 @@ export default function BackofficeLayout({ toggleTheme, isDarkMode }) {
             {drawerOpen ? 'Backoffice' : 'BO'}
           </Typography>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-            {/* Affichage de l'admin connecté */}
+            {}
             {user && (
               <Box sx={{ 
                 display: 'flex', 
@@ -371,7 +358,7 @@ export default function BackofficeLayout({ toggleTheme, isDarkMode }) {
               </Box>
             )}
 
-            {/* Bouton des notifications */}
+            {}
             <Tooltip title="Notifications">
               <IconButton 
                 color="inherit"
@@ -390,7 +377,7 @@ export default function BackofficeLayout({ toggleTheme, isDarkMode }) {
               </IconButton>
             </Tooltip>
             
-            {/* Bouton pour changer de thème */}
+            {}
             <Tooltip title={isDarkMode ? "Light Mode" : "Dark Mode"}>
               <IconButton 
                 color="inherit" 
@@ -406,7 +393,7 @@ export default function BackofficeLayout({ toggleTheme, isDarkMode }) {
               </IconButton>
             </Tooltip>
             
-            {/* Retour à l'accueil */}
+            {}
             <Tooltip title="Go to Website">
               <Button 
                 variant="contained" 
@@ -430,7 +417,7 @@ export default function BackofficeLayout({ toggleTheme, isDarkMode }) {
         </Toolbar>
       </AppBar>
 
-      {/* Drawer version desktop */}
+      {}
       <Drawer
         variant="permanent"
         sx={{
@@ -455,7 +442,7 @@ export default function BackofficeLayout({ toggleTheme, isDarkMode }) {
         {drawer}
       </Drawer>
 
-      {/* Drawer version mobile */}
+      {}
       <Drawer
         variant="temporary"
         open={mobileOpen}
@@ -472,7 +459,7 @@ export default function BackofficeLayout({ toggleTheme, isDarkMode }) {
         {drawer}
       </Drawer>
 
-      {/* Contenu principal */}
+      {}
       <Box
         component="main"
         sx={{
@@ -484,11 +471,11 @@ export default function BackofficeLayout({ toggleTheme, isDarkMode }) {
             easing: theme.transitions.easing.sharp,
             duration: theme.transitions.duration.leavingScreen,
           }),
-          mt: '64px', // Pour éviter que le contenu ne soit caché sous la barre d'application
-          overflowX: 'hidden', // Empêche le dépassement horizontal
+          mt: '64px',
+          overflowX: 'hidden',
         }}
       >
-        {/* Fil d'Ariane */}
+        {}
         <Paper 
           elevation={0} 
           sx={{ 

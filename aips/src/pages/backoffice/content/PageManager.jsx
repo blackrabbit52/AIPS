@@ -53,7 +53,6 @@ const PageManager = () => {
   };
 
   const handleSave = (pageData) => {
-    // Logique de sauvegarde
     setOpenDialog(false);
   };
 

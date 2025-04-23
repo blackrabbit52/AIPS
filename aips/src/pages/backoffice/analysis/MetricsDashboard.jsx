@@ -14,7 +14,7 @@ const MetricsDashboard = () => {
                             Performance Metrics
                         </Typography>
                         <Box sx={{ mt: 2 }}>
-                            {/* Métriques de performance */}
+                            {}
                         </Box>
                     </Paper>
                 </Grid>
@@ -24,7 +24,7 @@ const MetricsDashboard = () => {
                             Usage Statistics
                         </Typography>
                         <Box sx={{ mt: 2 }}>
-                            {/* Statistiques d'utilisation */}
+                            {}
                         </Box>
                     </Paper>
                 </Grid>

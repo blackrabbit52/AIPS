@@ -34,7 +34,7 @@ const PrivateRoute = ({ requiredRole }) => {
   }, [location]);
 
   if (isLoading) {
-    return null; // ou un composant de chargement
+    return null;
   }
 
   if (!isAuthenticated) {

@@ -326,7 +326,6 @@ const SystemSettings = () => {
       }
     } catch (err) {
       console.error("Error checking task status:", err);
-      // Si l'erreur persiste trop longtemps, arrêter de vérifier
       if (err.message.includes('Network Error') || err.message.includes('Connection Refused')) {
         setError("Cannot connect to analysis service. Please check if the service is running.");
         setCurrentTaskId(null);
@@ -335,7 +334,6 @@ const SystemSettings = () => {
   };
 
   const handleSave = () => {
-    // Logique de sauvegarde
     setSaved(true);
     setTimeout(() => setSaved(false), 3000);
   };
@@ -358,23 +356,8 @@ const SystemSettings = () => {
 
   const checkModelTrainingStatus = async () => {
     try {
-      // Désactivé temporairement - endpoint non disponible
-      // Sera activé après reconstruction du service
-      /*
-      const response = await AnalysisService.checkTrainingStatus();
-      if (response.data && response.data.is_training) {
-        setIsModelTraining(true);
-        setTrainingProgress(response.data.progress || 0);
-        if (response.data.task_id && !currentTaskId) {
-          setCurrentTaskId(response.data.task_id);
-        }
-      } else {
-        setIsModelTraining(false);
-        setTrainingProgress(0);
-      }
-      */
+
       
-      // Solution temporaire: vérifier l'état via l'API task_status si un ID de tâche existe
       if (currentTaskId) {
         const response = await AnalysisService.checkTaskStatus(currentTaskId);
         if (response.data && response.data.status === 'STARTED') {
@@ -395,7 +378,6 @@ const SystemSettings = () => {
             setEstimatedTotalTime(estimatedSeconds);
           }
           
-          // Estimation simple basée sur le temps écoulé
           const startTime = new Date(response.data.date_created || Date.now());
           const elapsedSeconds = (Date.now() - startTime) / 1000;
           const estimatedProgress = Math.min(Math.floor(elapsedSeconds / 6), 95); // Environ 10 minutes pour 100%
@@ -410,8 +392,7 @@ const SystemSettings = () => {
         }
       }
     } catch (err) {
-      // Ignorer les erreurs 404 spécifiques à l'endpoint training_status
-      if (err.response && err.response.status === 404 && 
+      if (err.response && err.response.status === 404 &&
           err.response.config.url.includes('training_status')) {
         console.log("Training status endpoint not yet available");
       } else {

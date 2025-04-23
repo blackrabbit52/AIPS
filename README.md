@@ -504,7 +504,7 @@ The development environment will start with:
 
 ### Troubleshooting
 
-If you encounter any issues:
+If you encounter any issues:        
 
 1. Ensure Docker Desktop is running
 2. Clean up Docker resources:

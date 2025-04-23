@@ -64,7 +64,6 @@ export const Navbar = ({ toggleTheme, isDarkMode }) => {
 
   useEffect(() => {
     if (user) {
-      // Simulé pour l'instant - à remplacer par votre API
       const fetchNotifications = async () => {
         try {
           // const response = await notificationService.getNotifications();
@@ -166,23 +165,19 @@ export const Navbar = ({ toggleTheme, isDarkMode }) => {
     return true;
   });
 
-  // Menus publics toujours visibles
   const publicMenuItems = [
     { text: 'Home', path: '/', icon: <HomeIcon /> },
     { text: 'About', path: '/about', icon: <InfoIcon /> }
   ];
 
-  // Menus protégés (visibles uniquement si connecté)
   const protectedMenuItems = [
     { text: 'Analysis', path: '/analysis', icon: <AnalyticsIcon /> }
   ];
 
-  // Menu réservé aux admins
   const adminMenuItems = user && (user.roles?.includes('ROLE_ADMIN') || user.roles?.includes('ROLE_SUPER_ADMIN')) ? [
     { text: 'Backoffice', path: '/backoffice', icon: <AdminPanelSettingsIcon /> }
   ] : [];
 
-  // Modifier les styles des boutons du menu principal
   const buttonStyle = {
     color: theme.palette.mode === 'light' ? theme.palette.primary.main : 'white',
     '&:hover': {
@@ -231,7 +226,7 @@ export const Navbar = ({ toggleTheme, isDarkMode }) => {
             AIPS Platform
           </Typography>
 
-          {/* Notifications - uniquement visible si connecté */}
+          {}
           {user && (
             <Tooltip title="Notifications">
               <IconButton
@@ -288,7 +283,7 @@ export const Navbar = ({ toggleTheme, isDarkMode }) => {
               </Button>
             ))}
 
-            {/* Ajout du menu admin */}
+            {}
             {adminMenuItems.map((item) => (
               <Button
                 key={item.text}
@@ -514,7 +509,7 @@ export const Navbar = ({ toggleTheme, isDarkMode }) => {
                       ? 'rgba(37, 99, 235, 0.08)'
                       : 'rgba(37, 99, 235, 0.15)',
                   },
-                  // Ne pas afficher les éléments qui nécessitent des rôles si l'utilisateur ne les a pas
+
                   display: (item.requireRole && (!user || !user.roles?.includes(item.requireRole))) ? 'none' : 'flex'
                 }}
               >

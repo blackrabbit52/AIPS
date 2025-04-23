@@ -183,7 +183,7 @@ export const Footer = () => {
               contact@aips-platform.com
             </Link>
             <Typography variant="body2" color="text.secondary">
-              Made with ❤️ by AIPS Team
+              Made with ❤️ by Jaynie
             </Typography>
           </Stack>
         </Box>
